@@ -4,6 +4,8 @@ import { motion } from "framer-motion"
 import { ArrowRight, Sparkles } from "lucide-react"
 import Lottie from "lottie-react"
 import moonAnimation from "@/public/Moon.json"
+import moonShootingStarAnimation from "@/public/Moon Shooting Star Background _ Designed and animate by Mohit Saini.json"
+import zodiacAnimation from "@/public/Zodiac sign.json"
 import { Button } from "@/components/ui/button"
 
 export function Hero() {
@@ -14,15 +16,31 @@ export function Hero() {
         <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-mystic/20 rounded-full blur-3xl animate-pulse-glow" />
         <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-gold/10 rounded-full blur-3xl animate-pulse-glow" style={{ animationDelay: "2s" }} />
       </div>
+      <div className="absolute inset-0 z-[1] pointer-events-none overflow-hidden mix-blend-screen opacity-75">
+        <Lottie
+          animationData={moonShootingStarAnimation}
+          loop
+          autoplay
+          rendererSettings={{ preserveAspectRatio: "xMidYMid slice" }}
+          className="h-full w-full object-cover [filter:brightness(1.35)_contrast(1.05)_saturate(0.6)]"
+        />
+      </div>
 
       {/* Decorative Elements */}
-      <div className="absolute top-20 left-10 md:left-20 opacity-20">
+      {/* <div className="mt-5 absolute top-16 left-6 md:left-16 opacity-80">
         <motion.div
           animate={{ rotate: 360 }}
           transition={{ duration: 60, repeat: Infinity, ease: "linear" }}
-          className="w-32 h-32 border border-gold/30 rounded-full"
-        />
-      </div>
+          className="relative w-24 h-24 md:w-32 md:h-32 rounded-full border border-gold/30 bg-gold/5 p-2"
+        >
+          <Lottie
+            animationData={zodiacAnimation}
+            loop
+            autoplay
+            className="w-full h-full object-contain opacity-90 [filter:sepia(0.85)_hue-rotate(330deg)_saturate(1.1)_brightness(1.35)]"
+          />
+        </motion.div>
+      </div> */}
       <div className="absolute bottom-16 right-8 md:right-20">
         <motion.div
           animate={{ y: [0, -10, 0] }}
@@ -46,9 +64,8 @@ export function Hero() {
           transition={{ duration: 0.8 }}
           className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-gold/30 bg-gold/5 mb-8"
         >
-          <Sparkles className="w-4 h-4 text-gold" />
           <span className="text-sm tracking-[0.2em] uppercase text-gold-muted font-sans">
-            Sabedoria Ancestral
+            Seja bem-vindo ao TSARA
           </span>
         </motion.div>
 
@@ -74,51 +91,48 @@ export function Hero() {
           transition={{ duration: 0.8, delay: 0.4 }}
           className="max-w-2xl mx-auto text-lg md:text-xl text-muted-foreground leading-relaxed mb-12 font-sans"
         >
-          Conecte-se com a magia do Tarot e do Baralho Cigano. 
-          Descubra artigos esotÃ©ricos selecionados para iluminar sua jornada espiritual.
+          Conecte-se com a magia do Tarot e do Baralho Cigano.
+          Descubra artigos esotéricos selecionados para iluminar sua jornada espiritual.
         </motion.p>
 
+        {/* Scroll Indicator */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 1, delay: 1.2 }}
+          className="mt-10 flex justify-center pointer-events-none"
+        >
+          <motion.div
+            animate={{ y: [0, 8, 0] }}
+            transition={{ duration: 2, repeat: Infinity }}
+            className="flex flex-col items-center gap-2 text-muted-foreground"
+          >
+            <span className="text-xs tracking-[0.3em] uppercase font-sans">Descubra</span>
+            <div className="w-px h-8 bg-gradient-to-b from-gold/50 to-transparent" />
+            <div className="flex flex-col items-center">
+              <div className="relative h-12 w-7 rounded-full border-2 border-gold/70">
+                <motion.div
+                  className="absolute left-1/2 top-2 h-2 w-2 -translate-x-1/2 rounded-full bg-gold"
+                  animate={{ y: [0, 16, 0], opacity: [0, 1, 0] }}
+                  transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                />
+              </div>
+              <div className="mt-2 flex flex-col items-center gap-1">
+                {[0, 1].map((index) => (
+                  <motion.span
+                    key={index}
+                    className="block h-2.5 w-2.5 rotate-45 border-b-2 border-r-2 border-gold/70"
+                    animate={{ opacity: [0.2, 1, 0.2], y: [0, 3, 0] }}
+                    transition={{ duration: 1.2, repeat: Infinity, delay: index * 0.2, ease: "easeInOut" }}
+                  />
+                ))}
+              </div>
+            </div>
+          </motion.div>
+        </motion.div>
+
         {/* CTA Buttons */}
-        <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.6 }}
-          className="flex flex-col sm:flex-row items-center justify-center gap-4"
-        >
-          <Button
-            size="lg"
-            className="bg-gold text-background hover:bg-gold/90 text-base tracking-wider px-8 py-6 font-sans group"
-          >
-            Agendar Consulta
-            <ArrowRight className="w-5 h-5 ml-2 transition-transform group-hover:translate-x-1" />
-          </Button>
-          <Button
-            size="lg"
-            variant="outline"
-            className="border-foreground/20 text-foreground hover:bg-foreground/5 hover:border-gold/50 text-base tracking-wider px-8 py-6 font-sans"
-          >
-            Explorar Loja
-          </Button>
-        </motion.div>
-
       </div>
-
-      {/* Scroll Indicator */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 1, delay: 1.2 }}
-        className="absolute bottom-1 left-1/2 -translate-x-1/2 z-20 pointer-events-none"
-      >
-        <motion.div
-          animate={{ y: [0, 8, 0] }}
-          transition={{ duration: 2, repeat: Infinity }}
-          className="flex flex-col items-center gap-2 text-muted-foreground"
-        >
-          <span className="text-xs tracking-[0.3em] uppercase font-sans">Descubra</span>
-          <div className="w-px h-8 bg-gradient-to-b from-gold/50 to-transparent" />
-        </motion.div>
-      </motion.div>
     </section>
   )
 }

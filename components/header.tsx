@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import Link from "next/link"
 import { motion, AnimatePresence } from "framer-motion"
 import { Menu, X, ShoppingBag, Calendar } from "lucide-react"
@@ -28,12 +28,23 @@ const navLinks = [
 export function Header() {
   const [isOpen, setIsOpen] = useState(false)
 
+  useEffect(() => {
+    if (!isOpen) return
+
+    const originalOverflow = document.body.style.overflow
+    document.body.style.overflow = "hidden"
+
+    return () => {
+      document.body.style.overflow = originalOverflow
+    }
+  }, [isOpen])
+
   return (
     <header className="fixed top-0 left-0 right-0 z-50">
       <div className="absolute inset-0 bg-background/80 backdrop-blur-md border-b border-border/50" />
 
       <nav className="relative max-w-7xl mx-auto px-6 py-4">
-        <div className="flex items-center justify-between">
+        <div className="relative z-50 flex items-center justify-between">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-3 group">
             <div className="relative">
@@ -102,62 +113,67 @@ export function Header() {
         <AnimatePresence>
           {isOpen && (
             <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              exit={{ opacity: 0, height: 0 }}
-              className="md:hidden overflow-hidden"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-40 md:hidden bg-background/95 backdrop-blur-lg"
             >
-              <div className="py-6 space-y-4">
-                {navLinks.map((link, index) => (
+              <div className="h-full overflow-y-auto px-6 pt-28 pb-8">
+                <div className="mx-auto flex min-h-full max-w-sm flex-col justify-between">
+                  <div className="space-y-6">
+                    {navLinks.map((link, index) => (
+                      <motion.div
+                        key={link.href}
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: index * 0.08 }}
+                      >
+                        <Link
+                          href={link.href}
+                          className="block py-2 text-2xl tracking-[0.1em] text-muted-foreground hover:text-gold transition-colors"
+                          onClick={() => setIsOpen(false)}
+                        >
+                          {link.label}
+                        </Link>
+                      </motion.div>
+                    ))}
+                  </div>
+
                   <motion.div
-                    key={link.href}
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: index * 0.1 }}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.3 }}
+                    className="pt-10 space-y-3"
                   >
-                    <Link
-                      href={link.href}
-                      className="block py-2 text-lg tracking-[0.1em] text-muted-foreground hover:text-gold transition-colors"
-                      onClick={() => setIsOpen(false)}
-                    >
-                      {link.label}
-                    </Link>
-                  </motion.div>
-                ))}
-                <motion.div
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.4 }}
-                  className="pt-4 space-y-3"
-                >
-                  <Link href="/login" onClick={() => setIsOpen(false)}>
-                    <Button
-                      variant="outline"
-                      className="w-full border-border text-foreground hover:bg-gold/10 hover:border-gold/50"
-                    >
-                      Entrar
-                    </Button>
-                  </Link>
-                  <div className="flex gap-3">
-                    <Link href="/carrinho" className="flex-1" onClick={() => setIsOpen(false)}>
+                    <Link href="/login" onClick={() => setIsOpen(false)}>
                       <Button
                         variant="outline"
-                        className="w-full border-gold/50 text-gold hover:bg-gold/10"
+                        className="w-full border-border text-foreground hover:bg-gold/10 hover:border-gold/50"
                       >
-                        <ShoppingBag className="w-4 h-4 mr-2" />
-                        Carrinho
+                        Entrar
                       </Button>
                     </Link>
-                    <Link href="/agendamento" className="flex-1" onClick={() => setIsOpen(false)}>
-                      <Button
-                        className="w-full bg-gold text-background hover:bg-gold/90"
-                      >
-                        <Calendar className="w-4 h-4 mr-2" />
-                        Agendar
-                      </Button>
-                    </Link>
-                  </div>
-                </motion.div>
+                    <div className="flex gap-3">
+                      <Link href="/carrinho" className="flex-1" onClick={() => setIsOpen(false)}>
+                        <Button
+                          variant="outline"
+                          className="w-full border-gold/50 text-gold hover:bg-gold/10"
+                        >
+                          <ShoppingBag className="w-4 h-4 mr-2" />
+                          Carrinho
+                        </Button>
+                      </Link>
+                      <Link href="/agendamento" className="flex-1" onClick={() => setIsOpen(false)}>
+                        <Button
+                          className="w-full bg-gold text-background hover:bg-gold/90"
+                        >
+                          <Calendar className="w-4 h-4 mr-2" />
+                          Agendar
+                        </Button>
+                      </Link>
+                    </div>
+                  </motion.div>
+                </div>
               </div>
             </motion.div>
           )}
