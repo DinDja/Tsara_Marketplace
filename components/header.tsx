@@ -79,6 +79,12 @@ export function Header() {
                   <DropdownMenuItem asChild>
                     <Link href="/conta" className="gap-2 cursor-pointer"><User className="w-4 h-4" /> Minha Conta</Link>
                   </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/minhas-consultas" className="gap-2 cursor-pointer"><Calendar className="w-4 h-4" /> Minhas Consultas</Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/meus-pedidos" className="gap-2 cursor-pointer"><ShoppingBag className="w-4 h-4" /> Meus Pedidos</Link>
+                  </DropdownMenuItem>
                   {user.role === "admin" && (
                     <DropdownMenuItem asChild>
                       <Link href="/admin" className="gap-2 cursor-pointer"><Settings className="w-4 h-4" /> Admin</Link>
@@ -149,6 +155,16 @@ export function Header() {
                         <Link href="/conta" onClick={() => setIsOpen(false)}>
                           <Button variant="outline" className="w-full border-border text-foreground hover:bg-gold/10 justify-start gap-2">
                             <User className="w-4 h-4" /> Minha Conta
+                          </Button>
+                        </Link>
+                        <Link href="/minhas-consultas" onClick={() => setIsOpen(false)}>
+                          <Button variant="outline" className="w-full border-border text-foreground hover:bg-gold/10 justify-start gap-2">
+                            <Calendar className="w-4 h-4" /> Minhas Consultas
+                          </Button>
+                        </Link>
+                        <Link href="/meus-pedidos" onClick={() => setIsOpen(false)}>
+                          <Button variant="outline" className="w-full border-border text-foreground hover:bg-gold/10 justify-start gap-2">
+                            <ShoppingBag className="w-4 h-4" /> Meus Pedidos
                           </Button>
                         </Link>
                         {user.role === "admin" && (

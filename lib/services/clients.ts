@@ -12,24 +12,56 @@ function mapDoc(d: any): Client {
     id: d.id,
     name: data.name,
     email: data.email,
-    phone: data.phone,
+    phone: data.phone ?? "",
     totalSpent: data.totalSpent ?? 0,
     totalAppointments: data.totalAppointments ?? 0,
     totalOrders: data.totalOrders ?? 0,
     lastActivity: data.lastActivity ?? "",
     vip: data.vip ?? false,
+    avatar: data.avatar || undefined,
+    createdAt: data.createdAt?.toDate?.() ?? new Date(),
+    updatedAt: data.updatedAt?.toDate?.() ?? new Date(),
+  }
+}
+
+function mapUserToClient(d: any): Client {
+  const data = d.data()
+  return {
+    id: d.id,
+    name: data.name ?? "Sem nome",
+    email: data.email ?? "",
+    phone: data.phone ?? "",
+    totalSpent: 0,
+    totalAppointments: 0,
+    totalOrders: 0,
+    lastActivity: "",
+    vip: false,
+    avatar: data.avatar || undefined,
     createdAt: data.createdAt?.toDate?.() ?? new Date(),
     updatedAt: data.updatedAt?.toDate?.() ?? new Date(),
   }
 }
 
 export async function getClients(): Promise<Client[]> {
+  const map = new Map<string, Client>()
+
   try {
     const snap = await getDocs(col)
-    return snap.docs.map(mapDoc)
+    snap.docs.forEach((d) => { const c = mapDoc(d); map.set(c.id, c) })
   } catch {
-    return []
+    // clients collection unavailable, fall through to users
   }
+
+  try {
+    const snap = await getDocs(collection(db, FIRESTORE_COLLECTIONS.users))
+    snap.docs.forEach((d) => {
+      if (!map.has(d.id) && d.data().role !== "admin") map.set(d.id, mapUserToClient(d))
+    })
+  } catch {
+    // users collection also unavailable
+  }
+
+  return Array.from(map.values())
 }
 
 export async function getClientById(id: string): Promise<Client | null> {

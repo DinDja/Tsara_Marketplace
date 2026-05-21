@@ -11,6 +11,7 @@ import {
 import { MoonIcon } from "@/components/moon-icon"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
 import { SkeletonProductGrid } from "@/components/ui/data-skeleton"
@@ -77,7 +78,7 @@ export default function ProdutoDetalhe() {
     setSubmittingReview(true)
     try {
       const { review: newReview, product: updated } = await createReview({
-        productId: product.id, userId: user.id, userName: user.name,
+        productId: product.id, userId: user.id, userName: user.name, userAvatar: user.avatar,
         rating: userRating, comment: userComment.trim(),
       })
       setReviews((prev) => [newReview, ...prev])
@@ -216,16 +217,17 @@ export default function ProdutoDetalhe() {
           ) : (
             <div className="space-y-4">
               {(showAllReviews ? reviews : reviews.slice(0, 3)).map((review) => (
-                <Card key={review.id} className="bg-card border-border p-6">
-                  <div className="flex items-start justify-between mb-3">
-                    <div>
-                      <div className="flex items-center gap-2 mb-1">
-                        <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold text-primary">
-                          {review.userName.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}
+                  <Card key={review.id} className="bg-card border-border p-6">
+                    <div className="flex items-start justify-between mb-3">
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <Avatar className="w-8 h-8">
+                            <AvatarImage src={review.userAvatar} alt={review.userName} />
+                            <AvatarFallback className="text-[10px] font-bold text-primary bg-primary/20">{review.userName.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}</AvatarFallback>
+                          </Avatar>
+                          <span className="text-sm font-medium text-foreground">{review.userName}</span>
                         </div>
-                        <span className="text-sm font-medium text-foreground">{review.userName}</span>
-                      </div>
-                      <div className="flex items-center gap-1 ml-10">
+                        <div className="flex items-center gap-1 ml-10">
                         {[1, 2, 3, 4, 5].map((s) => (
                           <Star key={s} className={cn("w-3.5 h-3.5", s <= review.rating ? "fill-gold text-gold" : "text-muted-foreground/30")} />
                         ))}

@@ -1,49 +1,85 @@
-"use client";
+"use client"
 
-import { useState } from "react";
-import Link from "next/link";
-import { motion, AnimatePresence } from "framer-motion";
+import { useState, useEffect } from "react"
+import Link from "next/link"
+import { motion, AnimatePresence } from "framer-motion"
 import {
-  ArrowLeft,
-  Minus,
-  Plus,
-  Trash2,
-  ShoppingBag,
-  CreditCard,
-  Truck,
-  Shield,
-  Tag,
-  MapPin,
-  Search,
-  Loader2,
-  Clock,
-} from "lucide-react";
-import { MoonIcon } from "@/components/moon-icon";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Separator } from "@/components/ui/separator";
-import { useCart } from "@/lib/contexts/cart-context";
-import { lookupCep, calculateShipping } from "@/lib/services/shipping";
-import { getCouponByCode } from "@/lib/services";
-import { toast } from "sonner";
-import type { CepResult, FreightOption } from "@/lib/services/shipping";
-import type { Coupon } from "@/lib/types";
+  ArrowLeft, Minus, Plus, Trash2, ShoppingBag,
+  CreditCard, Truck, Shield, Tag, MapPin,
+  Search, Loader2, Clock, Home, CheckCircle2,
+} from "lucide-react"
+import { MoonIcon } from "@/components/moon-icon"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Separator } from "@/components/ui/separator"
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select"
+import { useCart } from "@/lib/contexts/cart-context"
+import { useAuth } from "@/lib/contexts/auth-context"
+import { getAddresses, getCards, createOrder } from "@/lib/services"
+import { lookupCep, calculateShipping } from "@/lib/services/shipping"
+import { getCouponByCode } from "@/lib/services"
+import { CardBrandIcon } from "@/components/card-brand-icon"
+import { toast } from "sonner"
+import type { CepResult, FreightOption } from "@/lib/services/shipping"
+import type { Coupon, UserAddress, SavedCard, Order } from "@/lib/types"
 
 export default function CarrinhoPage() {
-  const { items, removeItem, updateQuantity, itemCount, subtotal } = useCart();
-  const [couponCode, setCouponCode] = useState("");
-  const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
-  const [couponLoading, setCouponLoading] = useState(false);
-  const [cep, setCep] = useState("");
-  const [cepLoading, setCepLoading] = useState(false);
-  const [cepSearched, setCepSearched] = useState(false);
-  const [cepResult, setCepResult] = useState<CepResult | null>(null);
-  const [freightOptions, setFreightOptions] = useState<FreightOption[]>([]);
-  const [selectedFreight, setSelectedFreight] = useState<FreightOption | null>(null);
+  const { user } = useAuth()
+  const { items, removeItem, updateQuantity, itemCount, subtotal, clearCart } = useCart()
+  const [couponCode, setCouponCode] = useState("")
+  const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null)
+  const [couponLoading, setCouponLoading] = useState(false)
+  const [cepSearched, setCepSearched] = useState(false)
+  const [cepResult, setCepResult] = useState<CepResult | null>(null)
+  const [freightOptions, setFreightOptions] = useState<FreightOption[]>([])
+  const [selectedFreight, setSelectedFreight] = useState<FreightOption | null>(null)
+  const [addresses, setAddresses] = useState<UserAddress[]>([])
+  const [selectedAddress, setSelectedAddress] = useState<UserAddress | null>(null)
+  const [cards, setCards] = useState<SavedCard[]>([])
+  const [selectedCard, setSelectedCard] = useState<SavedCard | null>(null)
+  const [submitting, setSubmitting] = useState(false)
+  const [orderDone, setOrderDone] = useState<Order | null>(null)
 
-  const discount = appliedCoupon ? subtotal * (appliedCoupon.discount / 100) : 0;
-  const shipping = selectedFreight?.price ?? 0;
-  const total = subtotal - discount + shipping;
+  useEffect(() => {
+    if (user) {
+      Promise.all([
+        getAddresses(user.id).then(setAddresses),
+        getCards(user.id).then(setCards),
+      ])
+    }
+  }, [user])
+
+  const discount = appliedCoupon ? subtotal * (appliedCoupon.discount / 100) : 0
+  const shipping = selectedFreight?.price ?? 0
+  const total = subtotal - discount + shipping
+
+  const handleAddressSelect = (addrId: string) => {
+    const addr = addresses.find((a) => a.id === addrId)
+    if (!addr) return
+    setSelectedAddress(addr)
+    const clean = addr.cep.replace(/\D/g, "")
+    if (clean.length !== 8) return
+    setCepLoading(true)
+    setSelectedFreight(null)
+    setFreightOptions([])
+    setCepSearched(true)
+    setCep(clean)
+    lookupCep(clean).then((result) => {
+      if (!result) { setCepLoading(false); return }
+      setCepResult(result)
+      const options = calculateShipping(clean, itemCount)
+      if (subtotal > 200) {
+        options.unshift({ name: "Frete Grátis", price: 0, days: options[0]?.days ?? 10 })
+      }
+      setFreightOptions(options)
+      setCepLoading(false)
+    })
+  }
+
+  const [cep, setCep] = useState("")
+  const [cepLoading, setCepLoading] = useState(false)
 
   const handleLookupCep = async () => {
     const clean = cep.replace(/\D/g, "")
@@ -77,34 +113,98 @@ export default function CarrinhoPage() {
       toast.success(`Cupom aplicado! ${coupon.discount}% de desconto`)
     } catch { toast.error("Erro ao validar cupom") }
     finally { setCouponLoading(false) }
-  };
+  }
 
-  const handleCheckout = () => {
-    toast.success("Pedido realizado com sucesso!", {
-      description: "Em breve enviaremos os detalhes por e-mail.",
-    });
-  };
+  const buildAddressString = (addr: UserAddress) =>
+    `${addr.street}, ${addr.number}${addr.complement ? ` - ${addr.complement}` : ""}, ${addr.neighborhood}, ${addr.city} - ${addr.state}, CEP ${addr.cep}`
+
+  const handleCheckout = async () => {
+    if (!user) { toast.error("Faça login para finalizar o pedido"); return }
+    if (!selectedAddress) { toast.error("Selecione um endereço de entrega"); return }
+    if (!selectedFreight) { toast.error("Selecione o frete"); return }
+    if (!selectedCard) { toast.error("Selecione um cartão de pagamento"); return }
+
+    setSubmitting(true)
+    try {
+      const payload: Record<string, any> = {
+        clientId: user.id,
+        client: user.name,
+        items: items.map((i) => ({ ...i })),
+        total,
+        subtotal,
+        discount,
+        shipping,
+        coupon: appliedCoupon?.code,
+        shippingAddress: buildAddressString(selectedAddress),
+        paymentMethod: `${selectedCard.brand} **** ${selectedCard.last4}`,
+        status: "pending",
+      }
+      Object.keys(payload).forEach((k) => { if (payload[k] === undefined) delete payload[k] })
+      const order = await createOrder(payload as any)
+      clearCart()
+      setOrderDone(order)
+      toast.success("Pedido realizado com sucesso!")
+    } catch (err: any) {
+      const code = err?.code || ""
+      toast.error(`Erro ao finalizar pedido (${code || "desconhecido"})`)
+    } finally {
+      setSubmitting(false)
+    }
+  }
 
   const handleRemove = (productId: string, name: string) => {
-    removeItem(productId);
-    toast.success(`${name} removido do carrinho`);
-  };
+    removeItem(productId)
+    toast.success(`${name} removido do carrinho`)
+  }
+
+  if (orderDone) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center px-4">
+        <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="text-center max-w-md">
+          <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-green-500/10 flex items-center justify-center">
+            <CheckCircle2 className="w-10 h-10 text-green-500" />
+          </div>
+          <h1 className="text-3xl font-bold text-foreground mb-2">Pedido Confirmado!</h1>
+          <p className="text-muted-foreground font-sans mb-6">
+            Seu pedido <strong className="text-foreground">#{orderDone.id.slice(0, 8)}</strong> foi realizado com sucesso.
+            Você receberá as atualizações por e-mail.
+          </p>
+          <div className="bg-card border border-border rounded-xl p-4 text-left text-sm font-sans space-y-2 mb-8">
+            <div className="flex justify-between text-muted-foreground">
+              <span>Subtotal</span><span>R$ {subtotal.toFixed(2).replace(".", ",")}</span>
+            </div>
+            {discount > 0 && (
+              <div className="flex justify-between text-green-500">
+                <span>Desconto</span><span>-R$ {discount.toFixed(2).replace(".", ",")}</span>
+              </div>
+            )}
+            <div className="flex justify-between text-muted-foreground">
+              <span>Frete</span><span>{shipping === 0 ? "Grátis" : `R$ ${shipping.toFixed(2).replace(".", ",")}`}</span>
+            </div>
+            <Separator className="my-2" />
+            <div className="flex justify-between font-bold text-foreground">
+              <span>Total</span><span className="text-primary">R$ {total.toFixed(2).replace(".", ",")}</span>
+            </div>
+          </div>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            <Button asChild variant="outline"><Link href="/meus-pedidos">Acompanhar Pedido</Link></Button>
+            <Button asChild className="bg-primary hover:bg-primary/90"><Link href="/">Continuar Comprando</Link></Button>
+          </div>
+        </motion.div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
-            <Link
-              href="/"
-              className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              <span className="font-sans text-sm">Continuar comprando</span>
+            <Link href="/" className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors">
+              <ArrowLeft className="w-4 h-4" /><span className="font-sans text-sm">Continuar comprando</span>
             </Link>
             <Link href="/" className="flex items-center gap-2">
-              <MoonIcon className="w-6 h-6 text-primary" />
-              <span className="text-xl font-bold text-foreground">Tsara</span>
+              <MoonIcon className="w-6 h-6 text-primary" /><span className="text-xl font-bold text-foreground">Tsara</span>
             </Link>
             <div className="w-32" />
           </div>
@@ -112,29 +212,18 @@ export default function CarrinhoPage() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
-        <motion.h1
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="text-3xl lg:text-4xl font-bold text-foreground mb-8"
-        >
+        <motion.h1 initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}
+          className="text-3xl lg:text-4xl font-bold text-foreground mb-8">
           Seu Carrinho {itemCount > 0 && `(${itemCount} ${itemCount === 1 ? "item" : "itens"})`}
         </motion.h1>
 
         {items.length === 0 ? (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="text-center py-16"
-          >
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-16">
             <div className="w-24 h-24 mx-auto mb-6 bg-secondary/50 rounded-full flex items-center justify-center">
               <ShoppingBag className="w-12 h-12 text-muted-foreground" />
             </div>
-            <h2 className="text-2xl font-semibold text-foreground mb-2">
-              Carrinho vazio
-            </h2>
-            <p className="text-muted-foreground font-sans mb-8">
-              Descubra nossos produtos místicos e encontre o que seu espírito precisa.
-            </p>
+            <h2 className="text-2xl font-semibold text-foreground mb-2">Carrinho vazio</h2>
+            <p className="text-muted-foreground font-sans mb-8">Descubra nossos produtos místicos e encontre o que seu espírito precisa.</p>
             <Button asChild className="bg-primary hover:bg-primary/90">
               <Link href="/#produtos">Explorar Produtos</Link>
             </Button>
@@ -144,69 +233,28 @@ export default function CarrinhoPage() {
             <div className="lg:col-span-2 space-y-4">
               <AnimatePresence>
                 {items.map((item, index) => (
-                  <motion.div
-                    key={item.productId}
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -20 }}
-                    transition={{ delay: index * 0.1 }}
-                    className="bg-card border border-border rounded-xl p-4 lg:p-6"
-                  >
+                  <motion.div key={item.productId} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ delay: index * 0.1 }} className="bg-card border border-border rounded-xl p-4 lg:p-6">
                     <div className="flex gap-4 lg:gap-6">
                       <div className="w-24 h-24 lg:w-32 lg:h-32 bg-secondary rounded-lg flex items-center justify-center shrink-0 overflow-hidden">
-                        {item.image ? (
-                          <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
-                        ) : (
-                          <div className="text-4xl text-primary/30">✧</div>
-                        )}
+                        {item.image ? <img src={item.image} alt={item.name} className="w-full h-full object-cover" /> : <div className="text-4xl text-primary/30">✧</div>}
                       </div>
-
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between gap-2">
                           <div>
-                            <span className="text-xs font-sans text-primary uppercase tracking-wider">
-                              {item.category}
-                            </span>
-                            <h3 className="text-lg font-semibold text-foreground mt-1">
-                              {item.name}
-                            </h3>
+                            <span className="text-xs font-sans text-primary uppercase tracking-wider">{item.category}</span>
+                            <h3 className="text-lg font-semibold text-foreground mt-1">{item.name}</h3>
                           </div>
-                          <button
-                            onClick={() => handleRemove(item.productId, item.name)}
-                            className="p-2 text-muted-foreground hover:text-destructive transition-colors cursor-pointer"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                          <button onClick={() => handleRemove(item.productId, item.name)} className="p-2 text-muted-foreground hover:text-destructive transition-colors cursor-pointer"><Trash2 className="w-4 h-4" /></button>
                         </div>
-
                         <div className="flex items-center justify-between mt-4">
                           <div className="flex items-center gap-3 bg-secondary/50 rounded-lg p-1">
-                            <button
-                              onClick={() => updateQuantity(item.productId, -1)}
-                              className="w-8 h-8 flex items-center justify-center rounded-md hover:bg-secondary transition-colors cursor-pointer"
-                            >
-                              <Minus className="w-4 h-4" />
-                            </button>
-                            <span className="w-8 text-center font-sans font-medium">
-                              {item.quantity}
-                            </span>
-                            <button
-                              onClick={() => updateQuantity(item.productId, 1)}
-                              className="w-8 h-8 flex items-center justify-center rounded-md hover:bg-secondary transition-colors cursor-pointer"
-                            >
-                              <Plus className="w-4 h-4" />
-                            </button>
+                            <button onClick={() => updateQuantity(item.productId, -1)} className="w-8 h-8 flex items-center justify-center rounded-md hover:bg-secondary transition-colors cursor-pointer"><Minus className="w-4 h-4" /></button>
+                            <span className="w-8 text-center font-sans font-medium">{item.quantity}</span>
+                            <button onClick={() => updateQuantity(item.productId, 1)} className="w-8 h-8 flex items-center justify-center rounded-md hover:bg-secondary transition-colors cursor-pointer"><Plus className="w-4 h-4" /></button>
                           </div>
-
                           <div className="text-right">
-                            <p className="text-lg font-bold text-primary">
-                              R$ {(item.price * item.quantity).toFixed(2).replace(".", ",")}
-                            </p>
-                            {item.quantity > 1 && (
-                              <p className="text-xs font-sans text-muted-foreground">
-                                R$ {item.price.toFixed(2).replace(".", ",")} cada
-                              </p>
-                            )}
+                            <p className="text-lg font-bold text-primary">R$ {(item.price * item.quantity).toFixed(2).replace(".", ",")}</p>
+                            {item.quantity > 1 && <p className="text-xs font-sans text-muted-foreground">R$ {item.price.toFixed(2).replace(".", ",")} cada</p>}
                           </div>
                         </div>
                       </div>
@@ -217,46 +265,27 @@ export default function CarrinhoPage() {
 
               <div className="bg-card border border-border rounded-xl p-4 lg:p-6">
                 <div className="flex items-center gap-2 mb-3">
-                  <Tag className="w-4 h-4 text-primary" />
-                  <span className="font-semibold text-foreground">Cupom de desconto</span>
+                  <Tag className="w-4 h-4 text-primary" /><span className="font-semibold text-foreground">Cupom de desconto</span>
                 </div>
                 <div className="flex gap-3">
-                  <Input
-                    placeholder="Digite seu cupom"
-                    value={couponCode}
+                  <Input placeholder="Digite seu cupom" value={couponCode}
                     onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
-                    className="font-sans bg-input/50 uppercase"
-                    disabled={!!appliedCoupon}
-                  />
-                  <Button
-                    onClick={applyCoupon}
-                    variant="outline"
-                    disabled={!!appliedCoupon || couponLoading}
-                    className="shrink-0"
-                  >
+                    className="font-sans bg-input/50 uppercase" disabled={!!appliedCoupon} />
+                  <Button onClick={applyCoupon} variant="outline" disabled={!!appliedCoupon || couponLoading} className="shrink-0">
                     {couponLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : appliedCoupon ? "Aplicado" : "Aplicar"}
                   </Button>
                 </div>
-                {appliedCoupon && (
-                  <p className="text-sm font-sans text-green-500 mt-2">
-                    Cupom {appliedCoupon.code} — {appliedCoupon.discount}% de desconto
-                  </p>
-                )}
+                {appliedCoupon && <p className="text-sm font-sans text-green-500 mt-2">Cupom {appliedCoupon.code} — {appliedCoupon.discount}% de desconto</p>}
               </div>
 
               <div className="bg-card border border-border rounded-xl p-4 lg:p-6">
                 <div className="flex items-center gap-2 mb-3">
-                  <MapPin className="w-4 h-4 text-primary" />
-                  <span className="font-semibold text-foreground">Calcular Frete</span>
+                  <MapPin className="w-4 h-4 text-primary" /><span className="font-semibold text-foreground">Calcular Frete</span>
                 </div>
                 <div className="flex gap-3">
-                  <Input
-                    placeholder="Digite seu CEP"
-                    value={cep}
+                  <Input placeholder="Digite seu CEP" value={cep}
                     onChange={(e) => setCep(e.target.value.replace(/\D/g, "").slice(0, 8))}
-                    className="font-sans bg-input/50 max-w-[180px]"
-                    maxLength={8}
-                  />
+                    className="font-sans bg-input/50 max-w-[180px]" maxLength={8} />
                   <Button onClick={handleLookupCep} disabled={cepLoading || cep.length !== 8} className="shrink-0 gap-2">
                     {cepLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
                     {cepLoading ? "Buscando..." : "Calcular"}
@@ -278,12 +307,9 @@ export default function CarrinhoPage() {
                           selectedFreight?.name === option.name
                             ? "border-primary bg-primary/5 ring-2 ring-primary/20"
                             : "border-border hover:border-primary/50 bg-card"
-                        }`}
-                      >
+                        }`}>
                         <div className="flex items-center gap-3">
-                          <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                            selectedFreight?.name === option.name ? "border-primary" : "border-muted-foreground"
-                          }`}>
+                          <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${selectedFreight?.name === option.name ? "border-primary" : "border-muted-foreground"}`}>
                             {selectedFreight?.name === option.name && <div className="w-2.5 h-2.5 rounded-full bg-primary" />}
                           </div>
                           <div>
@@ -304,72 +330,112 @@ export default function CarrinhoPage() {
             </div>
 
             <div className="lg:col-span-1">
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3 }}
-                className="bg-card border border-border rounded-xl p-6 sticky top-24"
-              >
-                <h2 className="text-xl font-bold text-foreground mb-6">Resumo do Pedido</h2>
+              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}
+                className="bg-card border border-border rounded-xl p-6 sticky top-24 space-y-6">
+
+                {user && addresses.length > 0 && (
+                  <div>
+                    <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+                      <MapPin className="w-4 h-4 text-primary" /> Endereço de Entrega
+                    </h3>
+                    <Select value={selectedAddress?.id ?? ""} onValueChange={handleAddressSelect}>
+                      <SelectTrigger className="font-sans">
+                        <SelectValue placeholder="Selecione um endereço" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {addresses.map((addr) => (
+                          <SelectItem key={addr.id} value={addr.id}>
+                            <span className="flex items-center gap-2">
+                              <Home className="w-3 h-3 shrink-0" />
+                              <span className="truncate">{addr.nickname || `${addr.street}, ${addr.number}`}</span>
+                            </span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {selectedAddress && (
+                      <p className="text-xs font-sans text-muted-foreground mt-2">
+                        {selectedAddress.street}, {selectedAddress.number}
+                        {selectedAddress.complement && ` - ${selectedAddress.complement}`}
+                        <br />{selectedAddress.neighborhood}, {selectedAddress.city} - {selectedAddress.state}
+                        <br />CEP: {selectedAddress.cep}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {user && cards.length > 0 && (
+                  <div>
+                    <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+                      <CreditCard className="w-4 h-4 text-primary" /> Forma de Pagamento
+                    </h3>
+                    <Select value={selectedCard?.id ?? ""} onValueChange={(id) => setSelectedCard(cards.find((c) => c.id === id) ?? null)}>
+                      <SelectTrigger className="font-sans">
+                        <SelectValue placeholder="Selecione um cartão" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {cards.map((card) => (
+                          <SelectItem key={card.id} value={card.id}>
+                            <span className="flex items-center gap-2">
+                              <CardBrandIcon brand={card.brand} className="w-8 h-5" />
+                              <span>**** {card.last4}</span>
+                            </span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {selectedCard && (
+                      <p className="text-xs font-sans text-muted-foreground mt-1">
+                        {selectedCard.holderName} — {selectedCard.expiryMonth}/{selectedCard.expiryYear}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                <Separator />
+
+                <h2 className="text-xl font-bold text-foreground">Resumo do Pedido</h2>
                 <div className="space-y-4 font-sans">
                   <div className="flex justify-between text-muted-foreground">
-                    <span>Subtotal ({itemCount} itens)</span>
-                    <span>R$ {subtotal.toFixed(2).replace(".", ",")}</span>
+                    <span>Subtotal ({itemCount} itens)</span><span>R$ {subtotal.toFixed(2).replace(".", ",")}</span>
                   </div>
                   {appliedCoupon && (
                     <div className="flex justify-between text-green-500">
-                      <span>Desconto ({appliedCoupon.discount}%)</span>
-                      <span>-R$ {discount.toFixed(2).replace(".", ",")}</span>
+                      <span>Desconto ({appliedCoupon.discount}%)</span><span>-R$ {discount.toFixed(2).replace(".", ",")}</span>
                     </div>
                   )}
                   <div className="flex justify-between text-muted-foreground">
                     <span>Frete</span>
-                    <span>
-                      {!cepSearched ? (
-                        <span className="text-muted-foreground">—</span>
-                      ) : selectedFreight?.price === 0 ? (
-                        <span className="text-green-500">Grátis</span>
-                      ) : selectedFreight ? (
-                        `R$ ${shipping.toFixed(2).replace(".", ",")}`
-                      ) : (
-                        <span className="text-muted-foreground">Selecione</span>
-                      )}
-                    </span>
+                    <span>{!cepSearched ? <span className="text-muted-foreground">—</span>
+                      : selectedFreight?.price === 0 ? <span className="text-green-500">Grátis</span>
+                      : selectedFreight ? `R$ ${shipping.toFixed(2).replace(".", ",")}`
+                      : <span className="text-muted-foreground">Selecione</span>}</span>
                   </div>
                   {!selectedFreight && (
                     <p className="text-xs text-muted-foreground">
                       {cepSearched ? "Selecione uma opção de frete" : "Calcule o frete informando seu CEP"}
                     </p>
                   )}
-                  {subtotal > 200 && (
-                    <p className="text-xs text-green-500">Frete grátis disponível para este pedido!</p>
-                  )}
+                  {subtotal > 200 && <p className="text-xs text-green-500">Frete grátis disponível para este pedido!</p>}
                   <Separator className="my-4" />
                   <div className="flex justify-between text-lg font-bold text-foreground">
-                    <span>Total</span>
-                    <span className="text-primary">
-                      R$ {total.toFixed(2).replace(".", ",")}
-                    </span>
+                    <span>Total</span><span className="text-primary">R$ {total.toFixed(2).replace(".", ",")}</span>
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    ou 3x de R$ {(total / 3).toFixed(2).replace(".", ",")} sem juros
-                  </p>
+                  <p className="text-xs text-muted-foreground">ou 3x de R$ {(total / 3).toFixed(2).replace(".", ",")} sem juros</p>
                 </div>
-                <Button
-                  onClick={handleCheckout}
-                  className="w-full mt-6 h-12 bg-primary hover:bg-primary/90 text-primary-foreground font-sans font-medium text-base shadow-lg shadow-primary/20"
-                >
-                  <CreditCard className="w-4 h-4 mr-2" />
-                  Finalizar Compra
+
+                <Button onClick={handleCheckout} disabled={submitting}
+                  className="w-full h-12 bg-primary hover:bg-primary/90 text-primary-foreground font-sans font-medium text-base shadow-lg shadow-primary/20">
+                  {submitting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CreditCard className="w-4 h-4 mr-2" />}
+                  {submitting ? "Processando..." : "Finalizar Compra"}
                 </Button>
-                <div className="mt-6 space-y-3">
+
+                <div className="space-y-3">
                   <div className="flex items-center gap-3 text-sm font-sans text-muted-foreground">
-                    <Truck className="w-4 h-4 text-primary" />
-                    <span>Entrega em todo Brasil</span>
+                    <Truck className="w-4 h-4 text-primary" /><span>Entrega em todo Brasil</span>
                   </div>
                   <div className="flex items-center gap-3 text-sm font-sans text-muted-foreground">
-                    <Shield className="w-4 h-4 text-primary" />
-                    <span>Pagamento 100% seguro</span>
+                    <Shield className="w-4 h-4 text-primary" /><span>Pagamento 100% seguro</span>
                   </div>
                 </div>
               </motion.div>
@@ -378,5 +444,5 @@ export default function CarrinhoPage() {
         )}
       </main>
     </div>
-  );
+  )
 }

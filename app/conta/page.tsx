@@ -25,6 +25,8 @@ import { CreditCardDisplay } from "@/components/credit-card"
 import { CardBrandIcon } from "@/components/card-brand-icon"
 import { useAuth } from "@/lib/contexts/auth-context"
 import { getAddresses, createAddress, deleteAddress, getCards, createCard, deleteCard } from "@/lib/services"
+import { doc, getDoc, setDoc, Timestamp } from "firebase/firestore"
+import { db } from "@/lib/firebase/config"
 import { lookupCep } from "@/lib/services/shipping"
 import { detectCardBrand, formatCardNumber, formatExpiry } from "@/lib/services/card-brand"
 import { toast } from "sonner"
@@ -34,6 +36,7 @@ export default function ContaPage() {
   const { user, logout, loading } = useAuth()
   const router = useRouter()
   const [name, setName] = useState("")
+  const [phone, setPhone] = useState("")
   const [saving, setSaving] = useState(false)
   const [addresses, setAddresses] = useState<UserAddress[]>([])
   const [cards, setCards] = useState<SavedCard[]>([])
@@ -45,6 +48,9 @@ export default function ContaPage() {
     if (!loading && !user) { router.push("/login"); return }
     if (user) {
       setName(user.name)
+      getDoc(doc(db, "users", user.id)).then((snap) => {
+        if (snap.exists() && snap.data().phone) setPhone(snap.data().phone)
+      })
       getAddresses(user.id).then(setAddresses).finally(() => setLoadingAddr(false))
       getCards(user.id).then(setCards).finally(() => setLoadingCards(false))
     }
@@ -52,9 +58,11 @@ export default function ContaPage() {
 
   const handleSave = async () => {
     setSaving(true)
-    await new Promise((r) => setTimeout(r, 600))
-    setSaving(false)
-    toast.success("Perfil atualizado com sucesso!")
+    try {
+      await setDoc(doc(db, "users", user!.id), { name, phone, updatedAt: Timestamp.now() }, { merge: true })
+      toast.success("Perfil atualizado com sucesso!")
+    } catch { toast.error("Erro ao salvar") }
+    finally { setSaving(false) }
   }
 
   const handleLogout = async () => {
@@ -172,7 +180,7 @@ export default function ContaPage() {
               <AnimatePresence mode="wait">
                 {tab === "dados" && (
                   <Section key="dados">
-                    <DadosPessoais name={name} setName={setName} email={user.email} saving={saving} onSave={handleSave} />
+                    <DadosPessoais name={name} setName={setName} phone={phone} setPhone={setPhone} email={user.email} saving={saving} onSave={handleSave} />
                   </Section>
                 )}
                 {tab === "enderecos" && (
@@ -215,8 +223,8 @@ function Section({ children, ...props }: { children: React.ReactNode; [key: stri
 
 // ─── Dados Pessoais ─────────────────────────────────────
 
-function DadosPessoais({ name, setName, email, saving, onSave }: {
-  name: string; setName: (v: string) => void; email: string; saving: boolean; onSave: () => void
+function DadosPessoais({ name, setName, phone, setPhone, email, saving, onSave }: {
+  name: string; setName: (v: string) => void; phone: string; setPhone: (v: string) => void; email: string; saving: boolean; onSave: () => void
 }) {
   return (
     <Card className="bg-card border-border">
@@ -245,7 +253,7 @@ function DadosPessoais({ name, setName, email, saving, onSave }: {
         <div className="space-y-2">
           <Label htmlFor="phone" className="font-sans text-sm">Telefone / WhatsApp</Label>
           <div className="relative">
-            <Input id="phone" placeholder="(00) 00000-0000" className="pl-10 h-12 bg-input/50 font-sans" />
+            <Input id="phone" placeholder="(00) 00000-0000" value={phone} onChange={(e) => setPhone(e.target.value)} className="pl-10 h-12 bg-input/50 font-sans" />
             <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           </div>
         </div>

@@ -61,6 +61,7 @@ export interface Client {
   totalOrders: number
   lastActivity: string
   vip: boolean
+  avatar?: string
   createdAt: Date
   updatedAt: Date
 }
@@ -70,6 +71,7 @@ export interface User {
   name: string
   email: string
   role: "admin" | "user"
+  phone?: string
   avatar?: string
   createdAt: Date
 }
@@ -94,8 +96,9 @@ export interface Order {
   discount: number
   shipping: number
   coupon?: string
-  status: "pending" | "processing" | "shipped" | "delivered" | "cancelled"
+  shippingAddress?: string
   paymentMethod?: string
+  status: "pending" | "processing" | "shipped" | "delivered" | "cancelled"
   createdAt: Date
   updatedAt: Date
 }
@@ -162,6 +165,7 @@ export interface Review {
   productId: string
   userId: string
   userName: string
+  userAvatar?: string
   rating: number
   comment: string
   createdAt: Date

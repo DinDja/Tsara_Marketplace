@@ -51,8 +51,10 @@ export async function createAppointment(data: Omit<Appointment, "id" | "createdA
   return { ...data, id: ref.id, createdAt: now.toDate(), updatedAt: now.toDate() }
 }
 
-export async function updateAppointmentStatus(id: string, status: Appointment["status"]): Promise<Appointment> {
-  await updateDoc(doc(db, FIRESTORE_COLLECTIONS.appointments, id), { status, updatedAt: Timestamp.now() })
+export async function updateAppointmentStatus(id: string, status: Appointment["status"], notes?: string): Promise<Appointment> {
+  const update: Record<string, any> = { status, updatedAt: Timestamp.now() }
+  if (notes !== undefined) update.notes = notes
+  await updateDoc(doc(db, FIRESTORE_COLLECTIONS.appointments, id), update)
   const snap = await getDoc(doc(db, FIRESTORE_COLLECTIONS.appointments, id))
   return mapDoc(snap)
 }
@@ -65,6 +67,32 @@ export async function getOccupiedSlots(date: string): Promise<string[]> {
   } catch {
     return []
   }
+}
+
+export async function getAppointmentsByClient(clientId: string, email: string): Promise<Appointment[]> {
+  const all: Appointment[] = []
+  const ids = new Set<string>()
+
+  const fetchBy = async (field: string, value: string) => {
+    try {
+      const q = query(col, where(field, "==", value))
+      const snap = await getDocs(q)
+      snap.docs.forEach((d) => {
+        const a = mapDoc(d)
+        if (!ids.has(a.id)) { ids.add(a.id); all.push(a) }
+      })
+    } catch {
+      // query failed for this field, try the other
+    }
+  }
+
+  await Promise.all([fetchBy("clientId", clientId), fetchBy("email", email)])
+
+  return all.sort((a, b) => {
+    const da = new Date(a.date + "T" + a.time).getTime()
+    const db = new Date(b.date + "T" + b.time).getTime()
+    return db - da
+  })
 }
 
 export async function deleteAppointment(id: string): Promise<void> {

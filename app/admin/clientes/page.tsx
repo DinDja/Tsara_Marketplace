@@ -25,6 +25,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { SkeletonClientCards, SkeletonStatsGrid } from "@/components/ui/data-skeleton";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { useClients } from "@/lib/hooks";
 import { toast } from "sonner";
 
@@ -102,10 +103,13 @@ export default function AdminClientes() {
               <Card key={client.id} className="bg-card border-border hover:border-primary/30 transition-colors">
                 <CardContent className="p-6">
                   <div className="flex items-start justify-between mb-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold text-lg">
-                        {client.name.split(" ").map((n) => n[0]).join("")}
-                      </div>
+                      <div className="flex items-center gap-3">
+                        <Avatar className="w-12 h-12">
+                          <AvatarImage src={client.avatar} alt={client.name} />
+                          <AvatarFallback className="text-sm font-bold text-primary bg-primary/10">
+                            {client.name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
                       <div>
                         <div className="flex items-center gap-2">
                           <h3 className="font-semibold text-foreground">{client.name}</h3>

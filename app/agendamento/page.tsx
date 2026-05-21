@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo, useEffect } from "react"
+import { useState, useMemo, useEffect, useCallback } from "react"
 import Link from "next/link"
 import { motion, AnimatePresence } from "framer-motion"
 import {
@@ -18,6 +18,8 @@ import { cn } from "@/lib/utils"
 import { ptBR } from "date-fns/locale"
 import { TIME_SLOTS } from "@/lib/constants"
 import { getOccupiedSlots, createAppointment, getConsultationTypes, getCouponByCode } from "@/lib/services"
+import { doc, getDoc } from "firebase/firestore"
+import { db } from "@/lib/firebase/config"
 import { useAuth } from "@/lib/contexts/auth-context"
 import { toast } from "sonner"
 import type { TimeSlot } from "@/lib/types"
@@ -53,6 +55,13 @@ export default function AgendamentoPage() {
         name: prev.name || user.name,
         email: prev.email || user.email,
       }))
+      if (!formData.phone) {
+        getDoc(doc(db, "users", user.id)).then((snap) => {
+          if (snap.exists() && snap.data().phone) {
+            setFormData((prev) => ({ ...prev, phone: snap.data().phone }))
+          }
+        })
+      }
     }
   }, [user])
 
@@ -67,8 +76,22 @@ export default function AgendamentoPage() {
   const discount = appliedCoupon ? price * (appliedCoupon.discount / 100) : 0
   const finalPrice = price - discount
 
-  const timeSlots = useMemo((): TimeSlot[] =>
-    TIME_SLOTS.map((time) => ({ time, available: !occupiedSlots.includes(time) })), [occupiedSlots])
+  const isToday = useCallback((date: Date) => {
+    const t = new Date(); t.setHours(0, 0, 0, 0)
+    const d = new Date(date); d.setHours(0, 0, 0, 0)
+    return t.getTime() === d.getTime()
+  }, [])
+
+  const timeSlots = useMemo((): TimeSlot[] => {
+    const now = new Date()
+    const currentHour = now.getHours()
+    const currentMin = now.getMinutes()
+    return TIME_SLOTS.map((time) => {
+      const [h, m] = time.split(":").map(Number)
+      const past = selectedDate && isToday(selectedDate) && (h < currentHour || (h === currentHour && m <= currentMin))
+      return { time, available: !occupiedSlots.includes(time) && !past }
+    })
+  }, [occupiedSlots, selectedDate, isToday])
 
   const availableSlots = timeSlots.filter((slot) => slot.available)
   const occupiedCount = timeSlots.length - availableSlots.length
@@ -97,7 +120,8 @@ export default function AgendamentoPage() {
     if (!selectedType || !selectedDate || !selectedTime) return
     setSubmitting(true)
     try {
-      await createAppointment({
+      const payload: Record<string, any> = {
+        clientId: user?.id,
         client: formData.name,
         email: formData.email,
         phone: formData.phone,
@@ -109,13 +133,20 @@ export default function AgendamentoPage() {
         price: finalPrice,
         coupon: appliedCoupon?.code,
         message: formData.message || undefined,
-      })
+      }
+      Object.keys(payload).forEach((k) => { if (payload[k] === undefined) delete payload[k] })
+      await createAppointment(payload as any)
       setStep(4)
       toast.success("Agendamento confirmado!", {
         description: `Sua consulta de ${selectedType.name} foi agendada com sucesso.`,
       })
-    } catch {
-      toast.error("Erro ao agendar. Tente novamente.")
+    } catch (err: any) {
+      const code = err?.code || ""
+      if (code.includes("permission-denied")) {
+        toast.error("As regras do Firestore precisam ser atualizadas. Peça ao admin para fazer deploy.")
+      } else {
+        toast.error(`Erro ao agendar (${code || "desconhecido"}). Tente novamente.`)
+      }
     } finally { setSubmitting(false) }
   }
 

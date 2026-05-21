@@ -4,14 +4,18 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { Eye, EyeOff, Mail, Lock, ArrowLeft } from "lucide-react";
+import { Eye, EyeOff, Mail, Lock, ArrowLeft, Loader2 } from "lucide-react";
 import { MoonIcon } from "@/components/moon-icon";
 import Lottie from "lottie-react";
 import moonShootingStarAnimation from "@/public/Moon Shooting Star Background _ Designed and animate by Mohit Saini.json";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
+} from "@/components/ui/dialog"
 import { useAuth } from "@/lib/contexts/auth-context";
+import { resetPassword } from "@/lib/services";
 import { toast } from "sonner";
 import Zodiac from "@/public/Astro zodiac.json";
 
@@ -21,6 +25,9 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
+  const [resetOpen, setResetOpen] = useState(false)
+  const [resetEmail, setResetEmail] = useState("")
+  const [resetting, setResetting] = useState(false)
   const { login, register, loginGoogle, loading } = useAuth();
   const router = useRouter();
 
@@ -152,12 +159,10 @@ export default function LoginPage() {
                   Senha
                 </Label>
                 {isLogin && (
-                  <Link
-                    href="#"
-                    className="text-xs font-sans text-primary hover:text-primary/80 transition-colors"
-                  >
+                  <button type="button" onClick={() => setResetOpen(true)}
+                    className="text-xs font-sans text-primary hover:text-primary/80 transition-colors cursor-pointer">
                     Esqueceu a senha?
-                  </Link>
+                  </button>
                 )}
               </div>
               <div className="relative">
@@ -241,6 +246,32 @@ export default function LoginPage() {
           />
         </div>
       </motion.div>
+
+      <Dialog open={resetOpen} onOpenChange={setResetOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Recuperar senha</DialogTitle>
+            <DialogDescription className="font-sans">Digite seu e-mail para receber o link de redefinição de senha</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Input type="email" placeholder="seu@email.com" value={resetEmail}
+              onChange={(e) => setResetEmail(e.target.value)} className="font-sans bg-input/50 h-12" />
+            <Button disabled={resetting || !resetEmail.trim()} onClick={async () => {
+              setResetting(true)
+              try {
+                await resetPassword(resetEmail)
+                toast.success("E-mail enviado! Verifique sua caixa de entrada.")
+                setResetOpen(false)
+                setResetEmail("")
+              } catch { toast.error("Erro ao enviar e-mail. Verifique se o e-mail está correto.") }
+              finally { setResetting(false) }
+            }} className="w-full h-12 font-sans gap-2">
+              {resetting && <Loader2 className="w-4 h-4 animate-spin" />}
+              {resetting ? "Enviando..." : "Enviar link"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -7,6 +7,7 @@ import Lottie from "lottie-react"
 import moonAnimation from "@/public/Moon.json"
 import moonShootingStarAnimation from "@/public/Moon Shooting Star Background _ Designed and animate by Mohit Saini.json"
 import zodiacAnimation from "@/public/Zodiac sign.json"
+import swipeGestureAnimation from "@/public/Swipe Gesture Up.json"
 import { Button } from "@/components/ui/button"
 
 export function Hero() {
@@ -103,24 +104,33 @@ export function Hero() {
           transition={{ duration: 1, delay: 1.2 }}
           className="mt-10 flex justify-center pointer-events-none"
         >
-          <motion.div
-            animate={{ y: [0, 8, 0] }}
-            transition={{ duration: 2, repeat: Infinity }}
-            className="flex flex-col items-center gap-2 text-muted-foreground"
-          >
-            <span className="text-xs tracking-[0.3em] uppercase font-sans">Descubra</span>
-            <div className="w-px h-8 bg-gradient-to-b from-gold/50 to-transparent" />
-            <div className="flex flex-col items-center">
-              <div className="relative h-12 w-7 rounded-full border-2 border-gold/70">
-                <motion.div
-                  className="absolute left-1/2 top-2 h-2 w-2 -translate-x-1/2 rounded-full bg-gold"
-                  animate={{ y: [0, 16, 0], opacity: [0, 1, 0] }}
-                  transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-                />
+          <div className="flex items-center justify-center">
+            <motion.div
+              animate={{ y: [0, 8, 0] }}
+              transition={{ duration: 2, repeat: Infinity }}
+              className="hidden md:flex flex-col items-center gap-2 text-muted-foreground"
+            >
+              <span className="text-xs tracking-[0.3em] uppercase font-sans">Descubra</span>
+              <div className="w-px h-8 bg-gradient-to-b from-gold/50 to-transparent" />
+              <div className="flex flex-col items-center">
+                <div className="relative h-12 w-7 rounded-full border-2 border-gold/70">
+                  <motion.div
+                    className="absolute left-1/2 top-2 h-2 w-2 -translate-x-1/2 rounded-full bg-gold"
+                    animate={{ y: [0, 16, 0], opacity: [0, 1, 0] }}
+                    transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                  />
+                </div>
               </div>
-              
+            </motion.div>
+            <div className="md:hidden w-[200px] h-[200px] opacity-80">
+              <Lottie
+                animationData={swipeGestureAnimation}
+                loop
+                autoplay
+                className="w-full h-full object-contain"
+              />
             </div>
-          </motion.div>
+          </div>
         </motion.div>
 
         {/* CTA Buttons */}

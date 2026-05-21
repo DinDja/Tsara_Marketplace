@@ -1,8 +1,9 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import { Cormorant_Garamond, Inter } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import './globals.css'
 import { Providers } from './providers'
+import { PwaRegister } from '@/components/pwa-register'
 
 const cormorant = Cormorant_Garamond({ 
   subsets: ["latin"],
@@ -18,9 +19,23 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: 'Tsara | Sabedoria Ancestral & Artigos Esotéricos',
   description: 'Descubra a magia do autoconhecimento com consultas de Tarot e Baralho Cigano, além de artigos esotéricos selecionados com cuidado.',
+  manifest: '/manifest.webmanifest',
+  appleWebApp: {
+    capable: true,
+    title: 'Tsara',
+    statusBarStyle: 'black-translucent',
+  },
   icons: {
     icon: '/icon.svg',
+    apple: '/icon.svg',
   },
+  other: {
+    'mobile-web-app-capable': 'yes',
+  },
+}
+
+export const viewport: Viewport = {
+  themeColor: '#0a0a0b',
 }
 
 export default function RootLayout({
@@ -33,6 +48,7 @@ export default function RootLayout({
       <body className={`${cormorant.variable} ${inter.variable} font-serif antialiased`}>
         <Providers>
           {children}
+          <PwaRegister />
         </Providers>
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>
