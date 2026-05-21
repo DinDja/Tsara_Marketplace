@@ -1,7 +1,10 @@
 "use client"
 
 import { motion } from "framer-motion"
-import { Sparkles, Heart, Eye, Moon } from "lucide-react"
+import { Heart, Eye, Moon } from "lucide-react"
+import { MoonIcon } from "@/components/moon-icon"
+import Zodiac from "@/public/Zodiac sign.json"
+import Lottie from "lottie-react"
 
 const values = [
   {
@@ -20,7 +23,7 @@ const values = [
     description: "Anos de estudo e prática para oferecer orientações genuínas.",
   },
   {
-    icon: Sparkles,
+    icon: MoonIcon,
     title: "Magia",
     description: "Produtos selecionados com cuidado e energizados com intenção.",
   },
@@ -65,11 +68,16 @@ export function About() {
                   />
                   {/* Center */}
                   <div className="absolute inset-0 flex items-center justify-center">
-                    <Sparkles className="w-12 h-12 text-gold animate-pulse" />
-                  </div>
+                    <Lottie
+                      animationData={Zodiac}
+                      loop
+                      autoplay
+                      rendererSettings={{ preserveAspectRatio: "xMidYMid slice" }}
+                      className="h-full w-full object-cover [filter:brightness(1.35)_contrast(1.05)_saturate(0.6)]"
+                    />                  </div>
                 </div>
               </div>
-              
+
               {/* Stars decoration */}
               <div className="absolute inset-0 stars-pattern opacity-50" />
             </div>
@@ -103,16 +111,16 @@ export function About() {
               Uma Jornada de<br />
               <span className="italic text-gold">Autoconhecimento</span>
             </h2>
-            
+
             <div className="mt-8 space-y-6 text-muted-foreground font-sans leading-relaxed">
               <p>
-                A Tsara nasceu do desejo de compartilhar a sabedoria ancestral dos oráculos 
-                de forma acessível e transformadora. Há mais de 8 anos, guio pessoas em 
+                A Tsara nasceu do desejo de compartilhar a sabedoria ancestral dos oráculos
+                de forma acessível e transformadora. Há mais de 8 anos, guio pessoas em
                 suas jornadas de autoconhecimento através do Tarot e do Baralho Cigano.
               </p>
               <p>
-                Nossa loja reúne artigos esotéricos cuidadosamente selecionados — cada 
-                cristal, vela e oráculo passa por um processo de energização antes de 
+                Nossa loja reúne artigos esotéricos cuidadosamente selecionados — cada
+                cristal, vela e oráculo passa por um processo de energização antes de
                 chegar até você, garantindo que sua energia esteja alinhada com seu propósito.
               </p>
             </div>

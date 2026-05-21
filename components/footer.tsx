@@ -1,7 +1,8 @@
 "use client"
 
 import Link from "next/link"
-import { Sparkles, Instagram, Mail, MessageCircle } from "lucide-react"
+import { Globe, Mail, MessageCircle } from "lucide-react"
+import { MoonIcon } from "@/components/moon-icon"
 import { Button } from "@/components/ui/button"
 
 const footerLinks = {
@@ -61,7 +62,7 @@ export function Footer() {
           <div className="lg:col-span-2">
             <Link href="/" className="flex items-center gap-2 group">
               <div className="relative">
-                <Sparkles className="w-8 h-8 text-gold transition-transform group-hover:scale-110" />
+                <MoonIcon className="w-8 h-8 text-gold transition-transform group-hover:scale-110" />
                 <div className="absolute inset-0 bg-gold/20 blur-xl animate-pulse-glow" />
               </div>
               <span className="text-2xl font-light tracking-[0.2em] text-foreground">
@@ -78,7 +79,7 @@ export function Footer() {
                 className="w-10 h-10 rounded-full bg-secondary/50 flex items-center justify-center text-muted-foreground hover:bg-gold/20 hover:text-gold transition-colors"
                 aria-label="Instagram"
               >
-                <Instagram className="w-5 h-5" />
+                <Globe className="w-5 h-5" />
               </a>
               <a 
                 href="#" 

@@ -1,7 +1,8 @@
 "use client"
 
 import { motion } from "framer-motion"
-import { ArrowRight, Sparkles } from "lucide-react"
+import { ArrowRight } from "lucide-react"
+import { MoonIcon } from "@/components/moon-icon"
 import Lottie from "lottie-react"
 import moonAnimation from "@/public/Moon.json"
 import moonShootingStarAnimation from "@/public/Moon Shooting Star Background _ Designed and animate by Mohit Saini.json"
@@ -41,11 +42,11 @@ export function Hero() {
           />
         </motion.div>
       </div> */}
-      <div className="absolute bottom-16 right-8 md:right-20">
+      <div className="absolute bottom-1 right-8 md:right-20 w-[200px] h-[200px] md:w-[300px] md:h-[300px] opacity-80">
         <motion.div
           animate={{ y: [0, -10, 0] }}
           transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
-          className="relative w-32 h-32 md:w-48 md:h-48"
+          className="relative "
         >
           <Lottie
             animationData={moonAnimation}
@@ -117,16 +118,7 @@ export function Hero() {
                   transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
                 />
               </div>
-              <div className="mt-2 flex flex-col items-center gap-1">
-                {[0, 1].map((index) => (
-                  <motion.span
-                    key={index}
-                    className="block h-2.5 w-2.5 rotate-45 border-b-2 border-r-2 border-gold/70"
-                    animate={{ opacity: [0.2, 1, 0.2], y: [0, 3, 0] }}
-                    transition={{ duration: 1.2, repeat: Infinity, delay: index * 0.2, ease: "easeInOut" }}
-                  />
-                ))}
-              </div>
+              
             </div>
           </motion.div>
         </motion.div>

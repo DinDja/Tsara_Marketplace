@@ -180,3 +180,110 @@
     radial-gradient(1px 1px at 160px 120px, rgba(255,215,0,0.2), transparent);
   background-size: 200px 200px;
 }
+
+/* Invisible scrollbars */
+html {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+html::-webkit-scrollbar {
+  display: none;
+}
+* {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+*::-webkit-scrollbar {
+  display: none;
+}
+
+/* Selection color */
+::selection {
+  background: oklch(0.65 0.12 45 / 0.4);
+  color: oklch(0.98 0.01 60);
+}
+
+/* ─── Calendar ───────────────────────────────────────── */
+.rdp-root {
+  --rdp-accent-color: oklch(0.75 0.12 45);
+  --rdp-accent-background-color: oklch(0.75 0.12 45 / 0.15);
+  --rdp-day_button-selected-border: 2px solid oklch(0.75 0.12 45);
+  --cell-size: 44px !important;
+}
+.rdp-month {
+  gap: 8px;
+}
+.rdp-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 2px;
+}
+.rdp-week {
+  display: flex;
+  width: 100%;
+  margin-top: 4px;
+  gap: 2px;
+}
+.rdp-day {
+  flex: 1;
+  padding: 1px;
+}
+.rdp-day_button {
+  width: 100% !important;
+  min-width: var(--cell-size) !important;
+  height: var(--cell-size) !important;
+  border-radius: 10px !important;
+  font-size: 0.9rem !important;
+}
+.rdp-root .rdp-day_button:not(:disabled):hover {
+  background: oklch(0.22 0.02 280);
+}
+.rdp-root .rdp-day_button[data-selected-single="true"] {
+  background: var(--rdp-accent-color) !important;
+  color: oklch(0.08 0.01 280) !important;
+  font-weight: 700;
+  box-shadow: 0 0 0 2px oklch(0.75 0.12 45 / 0.4);
+}
+.rdp-root .rdp-day_button:disabled {
+  opacity: 0.25;
+  cursor: not-allowed;
+}
+.rdp-nav {
+  margin-bottom: 8px;
+}
+.rdp-nav_button {
+  color: oklch(0.65 0.02 60);
+  transition: color 0.2s;
+  width: 36px !important;
+  height: 36px !important;
+}
+.rdp-nav_button:hover {
+  color: oklch(0.95 0.01 60);
+  background: oklch(0.18 0.02 280);
+  border-radius: 8px;
+}
+.rdp-nav_button svg {
+  width: 18px;
+  height: 18px;
+}
+.rdp-month_caption {
+  height: 40px !important;
+}
+.rdp-caption_label {
+  color: oklch(0.95 0.01 60);
+  font-weight: 600;
+  font-size: 1rem;
+}
+.rdp-weekday {
+  color: oklch(0.65 0.02 60);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding-bottom: 6px;
+  text-align: center;
+}
+.rdp-root .rdp-today:not([data-selected-single="true"]) .rdp-day_button {
+  background: oklch(0.75 0.12 45 / 0.12);
+  border: 1px solid oklch(0.75 0.12 45 / 0.25);
+  color: oklch(0.95 0.01 60);
+}

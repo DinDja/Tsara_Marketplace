@@ -204,6 +204,12 @@
 .chevrondown:nth-child(even) {
   animation: pulse54012 500ms ease infinite alternate 250ms;
 }
+Button{
+  cursor: pointer !important;
+}
+button a{
+  cursor: pointer !important;
+}
 
 @keyframes pulse54012 {
   from {
