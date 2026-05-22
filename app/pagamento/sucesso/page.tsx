@@ -63,7 +63,10 @@ function PagamentoSucessoContent() {
               order.items.map(async (item) => {
                 const product = await getProductById(item.productId)
                 if (product) {
-                  await updateProduct(item.productId, { sold: (product.sold || 0) + item.quantity })
+                  await updateProduct(item.productId, {
+                    sold: (product.sold || 0) + item.quantity,
+                    stock: Math.max(0, (product.stock || 0) - item.quantity),
+                  })
                 }
               })
             )

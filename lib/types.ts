@@ -87,6 +87,7 @@ export interface CartItem {
   image: string
   freeShipping?: boolean
   status?: string
+  stock?: number
 }
 
 export interface Order {

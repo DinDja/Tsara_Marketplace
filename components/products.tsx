@@ -27,7 +27,15 @@ export function Products() {
   const { addItem } = useCart()
 
   const handleAddToCart = (product: NonNullable<typeof products>[number]) => {
-    addItem(product)
+    if (product.stock <= 0 || product.status === "inactive") {
+      toast.error(`${product.name} está fora de estoque`)
+      return
+    }
+    const added = addItem(product)
+    if (!added) {
+      toast.error("Quantidade máxima em estoque atingida")
+      return
+    }
     toast.success(`${product.name} adicionado ao carrinho!`, {
       description: "O produto foi adicionado com sucesso.",
       action: { label: "Ver carrinho", onClick: () => window.location.href = "/carrinho" },
@@ -125,13 +133,19 @@ export function Products() {
                         </div>
                       )}
                       <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-background/40 backdrop-blur-sm">
-                        <Button
-                          className="bg-gold text-background hover:bg-gold/90 font-sans"
-                          onClick={(e) => { e.preventDefault(); handleAddToCart(product) }}
-                        >
-                          <ShoppingCart className="w-4 h-4 mr-2" />
-                          Adicionar
-                        </Button>
+                        {product.stock <= 0 || product.status === "inactive" ? (
+                          <span className="px-4 py-2 rounded-lg bg-destructive/10 text-destructive text-sm font-sans font-medium">
+                            Esgotado
+                          </span>
+                        ) : (
+                          <Button
+                            className="bg-gold text-background hover:bg-gold/90 font-sans"
+                            onClick={(e) => { e.preventDefault(); handleAddToCart(product) }}
+                          >
+                            <ShoppingCart className="w-4 h-4 mr-2" />
+                            Adicionar
+                          </Button>
+                        )}
                       </div>
                     </div>
 

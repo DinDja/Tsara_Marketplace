@@ -161,9 +161,16 @@ export default function ProdutoDetalhe() {
               <div className="flex items-center gap-1.5"><ShoppingCart className="w-4 h-4" /> {product.sold} vendidos</div>
             </div>
 
-            <Button onClick={() => { addItem(product); toast.success(`${product.name} adicionado ao carrinho!`) }}
-              className="w-full h-12 bg-primary hover:bg-primary/90 text-base font-sans gap-2">
-              <ShoppingCart className="w-5 h-5" /> Adicionar ao Carrinho
+            <Button onClick={() => {
+              if (product.stock <= 0 || product.status === "inactive") {
+                toast.error(`${product.name} está fora de estoque`)
+                return
+              }
+              addItem(product); toast.success(`${product.name} adicionado ao carrinho!`)
+            }}
+              className="w-full h-12 bg-primary hover:bg-primary/90 text-base font-sans gap-2"
+              disabled={product.stock <= 0 || product.status === "inactive"}>
+              <ShoppingCart className="w-5 h-5" /> {product.stock <= 0 ? "Esgotado" : "Adicionar ao Carrinho"}
             </Button>
 
             <div className="flex items-center gap-6 text-xs font-sans text-muted-foreground pt-2">

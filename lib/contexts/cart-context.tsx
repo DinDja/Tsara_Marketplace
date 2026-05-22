@@ -2,10 +2,11 @@
 
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from "react"
 import type { CartItem, Product } from "@/lib/types"
+import { getProductById } from "@/lib/services/products"
 
 interface CartContextType {
   items: CartItem[]
-  addItem: (product: Product, quantity?: number) => void
+  addItem: (product: Product, quantity?: number) => boolean
   removeItem: (productId: string) => void
   updateQuantity: (productId: string, delta: number) => void
   clearCart: () => void
@@ -42,15 +43,41 @@ export function CartProvider({ children }: { children: ReactNode }) {
   }, [])
 
   useEffect(() => {
+    if (!hydrated) return
+    ;(async () => {
+      const validated = await Promise.all(
+        items.map(async (item) => {
+          try {
+            const product = await getProductById(item.productId)
+            if (!product || product.stock <= 0 || product.status === "inactive") return null
+            return { ...item, stock: product.stock, status: product.status, price: product.price }
+          } catch {
+            return item
+          }
+        })
+      )
+      const filtered = validated.filter(Boolean) as CartItem[]
+      if (filtered.length !== items.length) setItems(filtered)
+    })()
+  }, [hydrated])
+
+  useEffect(() => {
     if (hydrated) saveCart(items)
   }, [items, hydrated])
 
   const addItem = useCallback((product: Product, quantity = 1) => {
+    if (product.stock <= 0 || product.status === "inactive") {
+      return false
+    }
     setItems((prev) => {
       const existing = prev.find((i) => i.productId === product.id)
+      const currentQty = existing ? existing.quantity : 0
+      if (currentQty + quantity > product.stock) {
+        return prev
+      }
       if (existing) {
         return prev.map((i) =>
-          i.productId === product.id ? { ...i, quantity: i.quantity + quantity } : i
+          i.productId === product.id ? { ...i, quantity: i.quantity + quantity, stock: product.stock } : i
         )
       }
       return [
@@ -65,9 +92,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
           image: product.image,
           freeShipping: product.freeShipping,
           status: product.status,
+          stock: product.stock,
         },
       ]
     })
+    return true
   }, [])
 
   const removeItem = useCallback((productId: string) => {
@@ -77,7 +106,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const updateQuantity = useCallback((productId: string, delta: number) => {
     setItems((prev) =>
       prev.map((i) =>
-        i.productId === productId ? { ...i, quantity: Math.max(1, i.quantity + delta) } : i
+        i.productId === productId ? { ...i, quantity: Math.max(1, Math.min(i.quantity + delta, i.stock || 99)) } : i
       )
     )
   }, [])

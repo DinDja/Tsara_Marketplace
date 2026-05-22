@@ -22,6 +22,7 @@ import {
 import { useCart } from "@/lib/contexts/cart-context"
 import { useAuth } from "@/lib/contexts/auth-context"
 import { getAddresses, createAddress, createOrder, updateOrder } from "@/lib/services"
+import { getProductById } from "@/lib/services/products"
 import { createInfinitePayCheckout } from "@/lib/services/infinitePay"
 import { lookupCep, calculateShipping } from "@/lib/services/shipping"
 import { getCouponByCode } from "@/lib/services"
@@ -125,6 +126,26 @@ export default function CarrinhoPage() {
 
     setSubmitting(true)
     try {
+      const stockChecks = await Promise.all(
+        items.map(async (item) => {
+          const product = await getProductById(item.productId)
+          return { item, product }
+        })
+      )
+      const outOfStock = stockChecks.filter(({ item, product }) =>
+        !product || product.stock <= 0 || product.status === "inactive"
+      )
+      const exceedsStock = stockChecks.filter(({ item, product }) =>
+        product && item.quantity > product.stock
+      )
+      if (outOfStock.length > 0) {
+        toast.error(`${outOfStock.map(({ item }) => item.name).join(", ")} ${outOfStock.length === 1 ? "está" : "estão"} fora de estoque`)
+        setSubmitting(false); return
+      }
+      if (exceedsStock.length > 0) {
+        toast.error(`Quantidade indisponível: ${exceedsStock.map(({ item, product }) => `${item.name} (máx: ${product!.stock})`).join(", ")}`)
+        setSubmitting(false); return
+      }
       const payload: Record<string, any> = {
         clientId: user.id,
         client: user.name,
@@ -242,19 +263,24 @@ export default function CarrinhoPage() {
                           <div>
                             <span className="text-xs font-sans text-primary uppercase tracking-wider">{item.category}</span>
                             <h3 className="text-lg font-semibold text-foreground mt-1">{item.name}</h3>
-                            {item.status === "inactive" ? (
+                            {item.status === "inactive" || (item.stock !== undefined && item.stock <= 0) ? (
                               <span className="text-[10px] font-sans font-medium px-2 py-0.5 rounded bg-red-500/10 text-red-500">Esgotado</span>
-                            ) : item.status === "low_stock" ? (
-                              <span className="text-[10px] font-sans font-medium px-2 py-0.5 rounded bg-yellow-500/10 text-yellow-500">Acabando</span>
+                            ) : item.stock !== undefined && item.stock <= 5 ? (
+                              <span className="text-[10px] font-sans font-medium px-2 py-0.5 rounded bg-yellow-500/10 text-yellow-500">Acabando ({item.stock} un.)</span>
                             ) : null}
+                            {item.stock !== undefined && item.quantity > item.stock && (
+                              <p className="text-[10px] font-sans text-red-500 mt-1">Disponível: {item.stock} un. — reduza a quantidade</p>
+                            )}
                           </div>
                           <button onClick={() => handleRemove(item.productId, item.name)} className="p-2 text-muted-foreground hover:text-destructive transition-colors cursor-pointer"><Trash2 className="w-4 h-4" /></button>
                         </div>
                         <div className="flex items-center justify-between mt-4">
                           <div className="flex items-center gap-3 bg-secondary/50 rounded-lg p-1">
-                            <button onClick={() => updateQuantity(item.productId, -1)} className="w-8 h-8 flex items-center justify-center rounded-md hover:bg-secondary transition-colors cursor-pointer"><Minus className="w-4 h-4" /></button>
+                            <button onClick={() => updateQuantity(item.productId, -1)} disabled={item.quantity <= 1}
+                              className="w-8 h-8 flex items-center justify-center rounded-md hover:bg-secondary transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"><Minus className="w-4 h-4" /></button>
                             <span className="w-8 text-center font-sans font-medium">{item.quantity}</span>
-                            <button onClick={() => updateQuantity(item.productId, 1)} className="w-8 h-8 flex items-center justify-center rounded-md hover:bg-secondary transition-colors cursor-pointer"><Plus className="w-4 h-4" /></button>
+                            <button onClick={() => updateQuantity(item.productId, 1)} disabled={item.stock !== undefined && item.quantity >= item.stock}
+                              className="w-8 h-8 flex items-center justify-center rounded-md hover:bg-secondary transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"><Plus className="w-4 h-4" /></button>
                           </div>
                           <div className="text-right">
                             <p className="text-lg font-bold text-primary">R$ {(item.price * item.quantity).toFixed(2).replace(".", ",")}</p>
