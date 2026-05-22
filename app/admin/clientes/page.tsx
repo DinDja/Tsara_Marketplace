@@ -8,7 +8,7 @@ import {
   MoreVertical,
   Mail,
   Phone,
-  ShoppingBag,
+  ShoppingCart,
   Star,
   Edit,
   Trash2,
@@ -63,8 +63,8 @@ export default function AdminClientes() {
           {[
             { label: "Total de Clientes", value: totalClients, icon: Users },
             { label: "Clientes VIP", value: vipClients, icon: Star },
-            { label: "Receita Total", value: `R$ ${totalRevenue.toFixed(0)}`, icon: ShoppingBag },
-            { label: "Ticket Médio", value: `R$ ${avgSpent.toFixed(0)}`, icon: ShoppingBag },
+            { label: "Receita Total", value: `R$ ${totalRevenue.toFixed(0)}`, icon: ShoppingCart },
+            { label: "Ticket Médio", value: `R$ ${avgSpent.toFixed(0)}`, icon: ShoppingCart },
           ].map((stat, index) => (
             <motion.div key={stat.label} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.1 }}>
               <Card className="bg-card border-border">

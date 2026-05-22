@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { MoonIcon } from "@/components/moon-icon"
 import { Card } from "@/components/ui/card"
 import { getConsultationTypes } from "@/lib/services"
+import { formatPrice } from "@/lib/utils"
 import type { ConsultationType } from "@/lib/services/consultations"
 
 const modalities = [
@@ -136,13 +137,13 @@ export function Consultations() {
                   <div className="mt-auto">
                     <div className="flex items-baseline gap-2 mb-4">
                       <span className="text-3xl text-gold font-sans">
-                        R$ {consultation.price.toFixed(2).replace(".", ",")}
+                        R$ {formatPrice(consultation.price)}
                       </span>
-                      {consultation.originalPrice && (
+                      {consultation.originalPrice ? (
                         <span className="text-sm text-muted-foreground line-through font-sans">
-                          R$ {consultation.originalPrice.toFixed(2).replace(".", ",")}
+                          R$ {formatPrice(consultation.originalPrice)}
                         </span>
-                      )}
+                      ) : null}
                     </div>
                     <Button
                       className={`w-full font-sans tracking-wider group ${

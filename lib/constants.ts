@@ -25,9 +25,8 @@ export const MODALITIES = [
 ] as const
 
 export const NAV_LINKS = [
-  { href: "#produtos", label: "Produtos" },
-  { href: "#consultas", label: "Consultas" },
-  { href: "#sobre", label: "Sobre" },
+  { href: "/produtos", label: "Loja" },
+  { href: "/consultas", label: "Consultas" },
   { href: "#depoimentos", label: "Depoimentos" },
 ] as const
 

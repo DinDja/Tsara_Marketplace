@@ -3,5 +3,6 @@ export { useProducts, useProduct, useFeaturedProducts, useProductsByCategory } f
 export { useAppointments, useOccupiedSlots } from "./useAppointments"
 export { useClients } from "./useClients"
 export { useDashboardStats, useTopProducts, useRecentAppointments, useRecentOrders } from "./useDashboard"
+export { useOrders } from "./useOrders"
 export { useAuth } from "../contexts/auth-context"
 export { useCart } from "../contexts/cart-context"

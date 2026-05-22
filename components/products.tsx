@@ -4,14 +4,14 @@ import { useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { motion } from "framer-motion"
-import { ShoppingBag, Star, ArrowRight } from "lucide-react"
+import { ShoppingCart, Star, ArrowRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { SkeletonProductGrid } from "@/components/ui/data-skeleton"
 import { useProductsByCategory } from "@/lib/hooks"
 import { useCart } from "@/lib/contexts/cart-context"
 import { toast } from "sonner"
-import { cn } from "@/lib/utils"
+import { cn, formatPrice } from "@/lib/utils"
 
 const categories = [
   { id: "all", label: "Todos" },
@@ -129,7 +129,7 @@ export function Products() {
                           className="bg-gold text-background hover:bg-gold/90 font-sans"
                           onClick={(e) => { e.preventDefault(); handleAddToCart(product) }}
                         >
-                          <ShoppingBag className="w-4 h-4 mr-2" />
+                          <ShoppingCart className="w-4 h-4 mr-2" />
                           Adicionar
                         </Button>
                       </div>
@@ -148,13 +148,13 @@ export function Products() {
                       </h3>
                       <div className="flex items-baseline gap-2">
                         <span className="text-xl text-gold font-sans font-medium">
-                          R$ {product.price.toFixed(2).replace(".", ",")}
+                          R$ {formatPrice(product.price)}
                         </span>
-                        {product.originalPrice && (
+                        {product.originalPrice ? (
                           <span className="text-sm text-muted-foreground line-through font-sans">
-                            R$ {product.originalPrice.toFixed(2).replace(".", ",")}
+                            R$ {formatPrice(product.originalPrice)}
                           </span>
-                        )}
+                        ) : null}
                       </div>
                     </div>
                   </Card>
@@ -170,14 +170,16 @@ export function Products() {
           viewport={{ once: true }}
           className="text-center mt-12"
         >
-          <Button
-            variant="outline"
-            size="lg"
-            className="border-gold/30 text-gold hover:bg-gold/10 tracking-wider font-sans group"
-          >
-            Ver Todos os Produtos
-            <ArrowRight className="w-4 h-4 ml-2 transition-transform group-hover:translate-x-1" />
-          </Button>
+          <Link href="/produtos">
+            <Button
+              variant="outline"
+              size="lg"
+              className="border-gold/30 text-gold hover:bg-gold/10 tracking-wider font-sans group"
+            >
+              Ver Todos os Produtos
+              <ArrowRight className="w-4 h-4 ml-2 transition-transform group-hover:translate-x-1" />
+            </Button>
+          </Link>
         </motion.div>
       </div>
     </section>

@@ -2,7 +2,7 @@ import {
   collection, getDocs, getDoc, doc, addDoc, updateDoc, deleteDoc, query, where, Timestamp,
 } from "firebase/firestore"
 import { db } from "@/lib/firebase/config"
-import type { UserAddress, SavedCard } from "@/lib/types"
+import type { UserAddress } from "@/lib/types"
 
 // ─── Addresses ─────────────────────────────────────────
 
@@ -38,32 +38,3 @@ export async function deleteAddress(uid: string, id: string): Promise<void> {
   await deleteDoc(doc(addrCol(uid), id))
 }
 
-// ─── Saved Cards ───────────────────────────────────────
-
-const cardCol = (uid: string) => collection(db, "users", uid, "cards")
-
-function mapCard(d: any): SavedCard {
-  const data = d.data()
-  return {
-    id: d.id, userId: data.userId, nickname: data.nickname,
-    last4: data.last4, brand: data.brand, holderName: data.holderName,
-    expiryMonth: data.expiryMonth, expiryYear: data.expiryYear,
-    isDefault: data.isDefault ?? false,
-    createdAt: data.createdAt?.toDate?.() ?? new Date(),
-  }
-}
-
-export async function getCards(uid: string): Promise<SavedCard[]> {
-  try { const snap = await getDocs(cardCol(uid)); return snap.docs.map(mapCard) }
-  catch { return [] }
-}
-
-export async function createCard(uid: string, data: Omit<SavedCard, "id" | "userId" | "createdAt">): Promise<SavedCard> {
-  const now = Timestamp.now()
-  const ref = await addDoc(cardCol(uid), { ...data, userId: uid, createdAt: now })
-  return { ...data, id: ref.id, userId: uid, createdAt: now.toDate() }
-}
-
-export async function deleteCard(uid: string, id: string): Promise<void> {
-  await deleteDoc(doc(cardCol(uid), id))
-}

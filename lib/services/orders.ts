@@ -1,4 +1,6 @@
-import { collection, getDocs, addDoc, query, where, Timestamp } from "firebase/firestore"
+import {
+  collection, getDocs, getDoc, doc, addDoc, updateDoc, query, where, Timestamp,
+} from "firebase/firestore"
 import { db, FIRESTORE_COLLECTIONS } from "@/lib/firebase/config"
 import type { Order } from "@/lib/types"
 
@@ -19,6 +21,11 @@ function mapDoc(d: any): Order {
     shippingAddress: data.shippingAddress,
     status: data.status ?? "pending",
     paymentMethod: data.paymentMethod,
+    orderNsu: data.orderNsu,
+    checkoutUrl: data.checkoutUrl,
+    transactionNsu: data.transactionNsu,
+    paidAmount: data.paidAmount,
+    captureMethod: data.captureMethod,
     createdAt: data.createdAt?.toDate?.() ?? new Date(),
     updatedAt: data.updatedAt?.toDate?.() ?? new Date(),
   }
@@ -33,10 +40,30 @@ export async function getOrders(): Promise<Order[]> {
   }
 }
 
+export async function getOrderById(id: string): Promise<Order | null> {
+  try {
+    const ref = doc(col, id)
+    const snap = await getDoc(ref)
+    if (!snap.exists()) return null
+    return mapDoc(snap)
+  } catch {
+    return null
+  }
+}
+
 export async function createOrder(data: Omit<Order, "id" | "createdAt" | "updatedAt">): Promise<Order> {
   const now = Timestamp.now()
   const ref = await addDoc(col, { ...data, createdAt: now, updatedAt: now })
   return { ...data, id: ref.id, createdAt: now.toDate(), updatedAt: now.toDate() }
+}
+
+export async function updateOrder(
+  id: string,
+  data: Partial<Omit<Order, "id" | "createdAt" | "updatedAt">>
+): Promise<void> {
+  const payload = { ...data, updatedAt: Timestamp.now() }
+  Object.keys(payload).forEach((k) => { if ((payload as any)[k] === undefined) delete (payload as any)[k] })
+  await updateDoc(doc(col, id), payload)
 }
 
 export async function getOrdersByClient(clientId: string): Promise<Order[]> {

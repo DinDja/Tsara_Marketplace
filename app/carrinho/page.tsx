@@ -4,10 +4,14 @@ import { useState, useEffect } from "react"
 import Link from "next/link"
 import { motion, AnimatePresence } from "framer-motion"
 import {
-  ArrowLeft, Minus, Plus, Trash2, ShoppingBag,
+  ArrowLeft, Minus, Plus, Trash2, ShoppingCart,
   CreditCard, Truck, Shield, Tag, MapPin,
-  Search, Loader2, Clock, Home, CheckCircle2,
+  Search, Loader2, Clock, Home,
 } from "lucide-react"
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription,
+} from "@/components/ui/dialog"
+import { Label } from "@/components/ui/label"
 import { MoonIcon } from "@/components/moon-icon"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -17,13 +21,13 @@ import {
 } from "@/components/ui/select"
 import { useCart } from "@/lib/contexts/cart-context"
 import { useAuth } from "@/lib/contexts/auth-context"
-import { getAddresses, getCards, createOrder } from "@/lib/services"
+import { getAddresses, createAddress, createOrder, updateOrder } from "@/lib/services"
+import { createInfinitePayCheckout } from "@/lib/services/infinitePay"
 import { lookupCep, calculateShipping } from "@/lib/services/shipping"
 import { getCouponByCode } from "@/lib/services"
-import { CardBrandIcon } from "@/components/card-brand-icon"
 import { toast } from "sonner"
 import type { CepResult, FreightOption } from "@/lib/services/shipping"
-import type { Coupon, UserAddress, SavedCard, Order } from "@/lib/types"
+import type { Coupon, UserAddress } from "@/lib/types"
 
 export default function CarrinhoPage() {
   const { user } = useAuth()
@@ -37,17 +41,11 @@ export default function CarrinhoPage() {
   const [selectedFreight, setSelectedFreight] = useState<FreightOption | null>(null)
   const [addresses, setAddresses] = useState<UserAddress[]>([])
   const [selectedAddress, setSelectedAddress] = useState<UserAddress | null>(null)
-  const [cards, setCards] = useState<SavedCard[]>([])
-  const [selectedCard, setSelectedCard] = useState<SavedCard | null>(null)
   const [submitting, setSubmitting] = useState(false)
-  const [orderDone, setOrderDone] = useState<Order | null>(null)
 
   useEffect(() => {
     if (user) {
-      Promise.all([
-        getAddresses(user.id).then(setAddresses),
-        getCards(user.id).then(setCards),
-      ])
+      getAddresses(user.id).then(setAddresses)
     }
   }, [user])
 
@@ -70,7 +68,8 @@ export default function CarrinhoPage() {
       if (!result) { setCepLoading(false); return }
       setCepResult(result)
       const options = calculateShipping(clean, itemCount)
-      if (subtotal > 200) {
+      const hasFreeShipping = items.some((i) => i.freeShipping)
+      if (hasFreeShipping || subtotal > 200) {
         options.unshift({ name: "Frete Grátis", price: 0, days: options[0]?.days ?? 10 })
       }
       setFreightOptions(options)
@@ -92,7 +91,8 @@ export default function CarrinhoPage() {
     if (!result) { toast.error("CEP não encontrado"); setCepLoading(false); return }
     setCepResult(result)
     const options = calculateShipping(cep, itemCount)
-    if (subtotal > 200) {
+    const hasFreeShipping = items.some((i) => i.freeShipping)
+    if (hasFreeShipping || subtotal > 200) {
       options.unshift({ name: "Frete Grátis", price: 0, days: options[0]?.days ?? 10 })
     }
     setFreightOptions(options)
@@ -122,7 +122,6 @@ export default function CarrinhoPage() {
     if (!user) { toast.error("Faça login para finalizar o pedido"); return }
     if (!selectedAddress) { toast.error("Selecione um endereço de entrega"); return }
     if (!selectedFreight) { toast.error("Selecione o frete"); return }
-    if (!selectedCard) { toast.error("Selecione um cartão de pagamento"); return }
 
     setSubmitting(true)
     try {
@@ -136,17 +135,55 @@ export default function CarrinhoPage() {
         shipping,
         coupon: appliedCoupon?.code,
         shippingAddress: buildAddressString(selectedAddress),
-        paymentMethod: `${selectedCard.brand} **** ${selectedCard.last4}`,
+        paymentMethod: "InfinitePay",
         status: "pending",
       }
       Object.keys(payload).forEach((k) => { if (payload[k] === undefined) delete payload[k] })
+
+      const checkoutItems = items.map((i) => ({
+        description: i.name,
+        quantity: i.quantity,
+        price: Math.round(i.price * 100),
+      }))
+
+      const subtotalCents = Math.round(subtotal * 100)
+      const shippingCents = Math.round(shipping * 100)
+      const discountCents = Math.round(discount * 100)
+
       const order = await createOrder(payload as any)
       clearCart()
-      setOrderDone(order)
-      toast.success("Pedido realizado com sucesso!")
+
+      const phoneNumber = user.phone?.replace(/\D/g, "") || ""
+
+      const checkoutResult = await createInfinitePayCheckout({
+        items: checkoutItems,
+        orderNsu: order.id,
+        redirectUrl: `${window.location.origin}/pagamento/sucesso`,
+        subtotalCents,
+        shippingCents,
+        discountCents,
+        cardType: "credit",
+        customer: {
+          name: user.name,
+          email: user.email,
+          ...((phoneNumber) && { phone_number: phoneNumber }),
+        },
+        address: {
+          cep: selectedAddress.cep.replace(/\D/g, ""),
+          number: selectedAddress.number,
+          complement: selectedAddress.complement || "",
+        },
+      })
+
+      await updateOrder(order.id, {
+        checkoutUrl: checkoutResult.url,
+        orderNsu: order.id,
+      })
+
+      window.location.href = checkoutResult.url
     } catch (err: any) {
       const code = err?.code || ""
-      toast.error(`Erro ao finalizar pedido (${code || "desconhecido"})`)
+      toast.error(`Erro ao finalizar pedido (${code || err.message || "desconhecido"})`)
     } finally {
       setSubmitting(false)
     }
@@ -155,44 +192,6 @@ export default function CarrinhoPage() {
   const handleRemove = (productId: string, name: string) => {
     removeItem(productId)
     toast.success(`${name} removido do carrinho`)
-  }
-
-  if (orderDone) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center px-4">
-        <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="text-center max-w-md">
-          <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-green-500/10 flex items-center justify-center">
-            <CheckCircle2 className="w-10 h-10 text-green-500" />
-          </div>
-          <h1 className="text-3xl font-bold text-foreground mb-2">Pedido Confirmado!</h1>
-          <p className="text-muted-foreground font-sans mb-6">
-            Seu pedido <strong className="text-foreground">#{orderDone.id.slice(0, 8)}</strong> foi realizado com sucesso.
-            Você receberá as atualizações por e-mail.
-          </p>
-          <div className="bg-card border border-border rounded-xl p-4 text-left text-sm font-sans space-y-2 mb-8">
-            <div className="flex justify-between text-muted-foreground">
-              <span>Subtotal</span><span>R$ {subtotal.toFixed(2).replace(".", ",")}</span>
-            </div>
-            {discount > 0 && (
-              <div className="flex justify-between text-green-500">
-                <span>Desconto</span><span>-R$ {discount.toFixed(2).replace(".", ",")}</span>
-              </div>
-            )}
-            <div className="flex justify-between text-muted-foreground">
-              <span>Frete</span><span>{shipping === 0 ? "Grátis" : `R$ ${shipping.toFixed(2).replace(".", ",")}`}</span>
-            </div>
-            <Separator className="my-2" />
-            <div className="flex justify-between font-bold text-foreground">
-              <span>Total</span><span className="text-primary">R$ {total.toFixed(2).replace(".", ",")}</span>
-            </div>
-          </div>
-          <div className="flex flex-col sm:flex-row gap-3 justify-center">
-            <Button asChild variant="outline"><Link href="/meus-pedidos">Acompanhar Pedido</Link></Button>
-            <Button asChild className="bg-primary hover:bg-primary/90"><Link href="/">Continuar Comprando</Link></Button>
-          </div>
-        </motion.div>
-      </div>
-    )
   }
 
   return (
@@ -220,7 +219,7 @@ export default function CarrinhoPage() {
         {items.length === 0 ? (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-16">
             <div className="w-24 h-24 mx-auto mb-6 bg-secondary/50 rounded-full flex items-center justify-center">
-              <ShoppingBag className="w-12 h-12 text-muted-foreground" />
+              <ShoppingCart className="w-12 h-12 text-muted-foreground" />
             </div>
             <h2 className="text-2xl font-semibold text-foreground mb-2">Carrinho vazio</h2>
             <p className="text-muted-foreground font-sans mb-8">Descubra nossos produtos místicos e encontre o que seu espírito precisa.</p>
@@ -243,6 +242,11 @@ export default function CarrinhoPage() {
                           <div>
                             <span className="text-xs font-sans text-primary uppercase tracking-wider">{item.category}</span>
                             <h3 className="text-lg font-semibold text-foreground mt-1">{item.name}</h3>
+                            {item.status === "inactive" ? (
+                              <span className="text-[10px] font-sans font-medium px-2 py-0.5 rounded bg-red-500/10 text-red-500">Esgotado</span>
+                            ) : item.status === "low_stock" ? (
+                              <span className="text-[10px] font-sans font-medium px-2 py-0.5 rounded bg-yellow-500/10 text-yellow-500">Acabando</span>
+                            ) : null}
                           </div>
                           <button onClick={() => handleRemove(item.productId, item.name)} className="p-2 text-muted-foreground hover:text-destructive transition-colors cursor-pointer"><Trash2 className="w-4 h-4" /></button>
                         </div>
@@ -333,61 +337,43 @@ export default function CarrinhoPage() {
               <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}
                 className="bg-card border border-border rounded-xl p-6 sticky top-24 space-y-6">
 
-                {user && addresses.length > 0 && (
+                {user && (
                   <div>
                     <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
                       <MapPin className="w-4 h-4 text-primary" /> Endereço de Entrega
                     </h3>
-                    <Select value={selectedAddress?.id ?? ""} onValueChange={handleAddressSelect}>
-                      <SelectTrigger className="font-sans">
-                        <SelectValue placeholder="Selecione um endereço" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {addresses.map((addr) => (
-                          <SelectItem key={addr.id} value={addr.id}>
-                            <span className="flex items-center gap-2">
-                              <Home className="w-3 h-3 shrink-0" />
-                              <span className="truncate">{addr.nickname || `${addr.street}, ${addr.number}`}</span>
-                            </span>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {selectedAddress && (
-                      <p className="text-xs font-sans text-muted-foreground mt-2">
-                        {selectedAddress.street}, {selectedAddress.number}
-                        {selectedAddress.complement && ` - ${selectedAddress.complement}`}
-                        <br />{selectedAddress.neighborhood}, {selectedAddress.city} - {selectedAddress.state}
-                        <br />CEP: {selectedAddress.cep}
-                      </p>
-                    )}
-                  </div>
-                )}
-
-                {user && cards.length > 0 && (
-                  <div>
-                    <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
-                      <CreditCard className="w-4 h-4 text-primary" /> Forma de Pagamento
-                    </h3>
-                    <Select value={selectedCard?.id ?? ""} onValueChange={(id) => setSelectedCard(cards.find((c) => c.id === id) ?? null)}>
-                      <SelectTrigger className="font-sans">
-                        <SelectValue placeholder="Selecione um cartão" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {cards.map((card) => (
-                          <SelectItem key={card.id} value={card.id}>
-                            <span className="flex items-center gap-2">
-                              <CardBrandIcon brand={card.brand} className="w-8 h-5" />
-                              <span>**** {card.last4}</span>
-                            </span>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {selectedCard && (
-                      <p className="text-xs font-sans text-muted-foreground mt-1">
-                        {selectedCard.holderName} — {selectedCard.expiryMonth}/{selectedCard.expiryYear}
-                      </p>
+                    {addresses.length > 0 ? (
+                      <div className="space-y-2">
+                        <Select value={selectedAddress?.id ?? ""} onValueChange={handleAddressSelect}>
+                          <SelectTrigger className="font-sans">
+                            <SelectValue placeholder="Selecione um endereço" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {addresses.map((addr) => (
+                              <SelectItem key={addr.id} value={addr.id}>
+                                <span className="flex items-center gap-2">
+                                  <Home className="w-3 h-3 shrink-0" />
+                                  <span className="truncate">{addr.nickname || `${addr.street}, ${addr.number}`}</span>
+                                </span>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        {selectedAddress && (
+                          <p className="text-xs font-sans text-muted-foreground">
+                            {selectedAddress.street}, {selectedAddress.number}
+                            {selectedAddress.complement && ` - ${selectedAddress.complement}`}
+                            <br />{selectedAddress.neighborhood}, {selectedAddress.city} - {selectedAddress.state}
+                            <br />CEP: {selectedAddress.cep}
+                          </p>
+                        )}
+                        <NewAddressDialog uid={user.id} onRefresh={() => getAddresses(user.id).then(setAddresses)} />
+                      </div>
+                    ) : (
+                      <div className="text-center py-6">
+                        <p className="text-sm font-sans text-muted-foreground mb-3">Nenhum endereço cadastrado</p>
+                        <NewAddressDialog uid={user.id} onRefresh={() => getAddresses(user.id).then(setAddresses)} />
+                      </div>
                     )}
                   </div>
                 )}
@@ -416,7 +402,7 @@ export default function CarrinhoPage() {
                       {cepSearched ? "Selecione uma opção de frete" : "Calcule o frete informando seu CEP"}
                     </p>
                   )}
-                  {subtotal > 200 && <p className="text-xs text-green-500">Frete grátis disponível para este pedido!</p>}
+                  {(items.some((i) => i.freeShipping) || subtotal > 200) && <p className="text-xs text-green-500">Frete grátis disponível para este pedido!</p>}
                   <Separator className="my-4" />
                   <div className="flex justify-between text-lg font-bold text-foreground">
                     <span>Total</span><span className="text-primary">R$ {total.toFixed(2).replace(".", ",")}</span>
@@ -444,5 +430,95 @@ export default function CarrinhoPage() {
         )}
       </main>
     </div>
+  )
+}
+
+// ─── New Address Dialog ─────────────────────────────────
+
+function NewAddressDialog({ uid, onRefresh }: { uid: string; onRefresh: () => void }) {
+  const [open, setOpen] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [form, setForm] = useState({ nickname: "", cep: "", street: "", number: "", complement: "", neighborhood: "", city: "", state: "" })
+
+  const handleCepBlur = async () => {
+    const clean = form.cep.replace(/\D/g, "")
+    if (clean.length !== 8) return
+    const result = await lookupCep(form.cep)
+    if (!result) return
+    setForm((f) => ({ ...f, street: result.logradouro, neighborhood: result.bairro, city: result.cidade, state: result.estado }))
+  }
+
+  const handleSave = async () => {
+    if (!form.nickname || !form.cep || !form.street || !form.number || !form.city || !form.state) {
+      toast.error("Preencha os campos obrigatórios"); return
+    }
+    setSaving(true)
+    try {
+      await createAddress(uid, { ...form, isDefault: false })
+      toast.success("Endereço salvo!"); setOpen(false); onRefresh()
+      setForm({ nickname: "", cep: "", street: "", number: "", complement: "", neighborhood: "", city: "", state: "" })
+    } catch { toast.error("Erro ao salvar") }
+    finally { setSaving(false) }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant="outline" size="sm" className="w-full font-sans gap-1.5"><Plus className="w-4 h-4" /> Novo endereço</Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Novo Endereço</DialogTitle>
+          <DialogDescription className="font-sans">Preencha os dados do seu endereço de entrega</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label className="font-sans text-sm">Apelido *</Label>
+            <Input value={form.nickname} onChange={(e) => setForm({ ...form, nickname: e.target.value })} placeholder="Ex: Minha Casa" className="font-sans bg-input/50" />
+          </div>
+          <div className="space-y-2">
+            <Label className="font-sans text-sm">CEP *</Label>
+            <Input value={form.cep} onChange={(e) => setForm({ ...form, cep: e.target.value.replace(/\D/g, "").slice(0, 8) })}
+              onBlur={handleCepBlur} placeholder="00000000" maxLength={8} className="font-sans bg-input/50" />
+            <p className="text-xs font-sans text-muted-foreground">O endereço é preenchido automaticamente ao sair do campo</p>
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            <div className="col-span-2 space-y-2">
+              <Label className="font-sans text-sm">Logradouro *</Label>
+              <Input value={form.street} onChange={(e) => setForm({ ...form, street: e.target.value })} className="font-sans bg-input/50" />
+            </div>
+            <div className="space-y-2">
+              <Label className="font-sans text-sm">Número *</Label>
+              <Input value={form.number} onChange={(e) => setForm({ ...form, number: e.target.value })} className="font-sans bg-input/50" />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label className="font-sans text-sm">Complemento</Label>
+            <Input value={form.complement} onChange={(e) => setForm({ ...form, complement: e.target.value })} placeholder="Apto, Bloco, etc." className="font-sans bg-input/50" />
+          </div>
+          <div className="space-y-2">
+            <Label className="font-sans text-sm">Bairro</Label>
+            <Input value={form.neighborhood} onChange={(e) => setForm({ ...form, neighborhood: e.target.value })} className="font-sans bg-input/50" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label className="font-sans text-sm">Cidade *</Label>
+              <Input value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} className="font-sans bg-input/50" />
+            </div>
+            <div className="space-y-2">
+              <Label className="font-sans text-sm">Estado *</Label>
+              <Input value={form.state} onChange={(e) => setForm({ ...form, state: e.target.value.toUpperCase().slice(0, 2) })} maxLength={2} placeholder="UF" className="font-sans bg-input/50 uppercase" />
+            </div>
+          </div>
+          <div className="flex gap-3 pt-2">
+            <Button variant="outline" onClick={() => setOpen(false)} className="flex-1 font-sans">Cancelar</Button>
+            <Button onClick={handleSave} disabled={saving} className="flex-1 font-sans gap-2">
+              {saving && <Loader2 className="w-4 h-4 animate-spin" />}
+              {saving ? "Salvando..." : "Salvar"}
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   )
 }

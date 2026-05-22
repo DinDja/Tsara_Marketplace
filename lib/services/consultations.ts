@@ -60,14 +60,16 @@ export async function getConsultationTypeById(id: string): Promise<ConsultationT
 
 export async function createConsultationType(data: Omit<ConsultationType, "id" | "createdAt" | "updatedAt">): Promise<ConsultationType> {
   const now = Timestamp.now()
-  const payload: any = { ...data, createdAt: now, updatedAt: now }
+  const payload: Record<string, any> = { ...data, createdAt: now, updatedAt: now }
+  Object.keys(payload).forEach((k) => { if (payload[k] === undefined) delete payload[k] })
   if (payload.image) payload.image = await encodeImage(payload.image)
   const ref = await addDoc(col, payload)
   return { ...data, id: ref.id, createdAt: now.toDate(), updatedAt: now.toDate() }
 }
 
 export async function updateConsultationType(id: string, data: Partial<ConsultationType>): Promise<ConsultationType> {
-  const payload: any = { ...data, updatedAt: Timestamp.now() }
+  const payload: Record<string, any> = { ...data, updatedAt: Timestamp.now() }
+  Object.keys(payload).forEach((k) => { if (payload[k] === undefined) delete payload[k] })
   if (payload.image) payload.image = await encodeImage(payload.image)
   await updateDoc(doc(db, "consultations", id), payload)
   return (await getConsultationTypeById(id))!

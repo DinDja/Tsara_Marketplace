@@ -22,6 +22,18 @@ function mapFirebaseUser(fu: any): User {
   }
 }
 
+async function enrichUserFromFirestore(user: User): Promise<User> {
+  const snap = await getDoc(doc(db, FIRESTORE_COLLECTIONS.users, user.id))
+  if (snap.exists()) {
+    const data = snap.data()
+    if (data.role) user.role = data.role
+    if (data.phone) user.phone = data.phone
+    if (data.name) user.name = data.name
+    if (data.avatar) user.avatar = data.avatar
+  }
+  return user
+}
+
 async function saveUserToFirestore(user: User) {
   await setDoc(doc(db, FIRESTORE_COLLECTIONS.users, user.id), {
     name: user.name,
@@ -34,11 +46,7 @@ async function saveUserToFirestore(user: User) {
 
 export async function loginWithEmail(email: string, password: string): Promise<User> {
   const cred = await signInWithEmailAndPassword(auth, email, password)
-  const user = mapFirebaseUser(cred.user)
-  const snap = await getDoc(doc(db, FIRESTORE_COLLECTIONS.users, user.id))
-  if (snap.exists() && snap.data().role) {
-    user.role = snap.data().role
-  }
+  const user = await enrichUserFromFirestore(mapFirebaseUser(cred.user))
   return user
 }
 
@@ -59,7 +67,10 @@ export async function loginWithGoogle(): Promise<User> {
   if (!snap.exists()) {
     await saveUserToFirestore(user)
   } else {
-    user.role = snap.data()?.role || "user"
+    Object.assign(user, {
+      role: snap.data()?.role || "user",
+      phone: snap.data()?.phone || undefined,
+    })
   }
   return user
 }
@@ -73,11 +84,7 @@ export async function getCurrentUser(): Promise<User | null> {
     const unsubscribe = auth.onAuthStateChanged(async (firebaseUser) => {
       unsubscribe()
       if (!firebaseUser) return resolve(null)
-      const user = mapFirebaseUser(firebaseUser)
-      const snap = await getDoc(doc(db, FIRESTORE_COLLECTIONS.users, user.id))
-      if (snap.exists() && snap.data().role) {
-        user.role = snap.data().role
-      }
+      const user = await enrichUserFromFirestore(mapFirebaseUser(firebaseUser))
       resolve(user)
     })
   })

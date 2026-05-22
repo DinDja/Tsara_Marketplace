@@ -15,6 +15,7 @@ import {
   Star,
   ArrowLeft,
   Percent,
+  ShoppingCart,
 } from "lucide-react";
 import { MoonIcon } from "@/components/moon-icon";
 import { cn } from "@/lib/utils";
@@ -28,6 +29,7 @@ const navigation = [
   { name: "Agendamentos", href: "/admin/agendamentos", icon: Calendar },
   { name: "Consultas", href: "/admin/consultas", icon: Star },
   { name: "Produtos", href: "/admin/produtos", icon: Package },
+  { name: "Pedidos", href: "/admin/pedidos", icon: ShoppingCart },
   { name: "Clientes", href: "/admin/clientes", icon: Users },
   { name: "Cupons", href: "/admin/cupons", icon: Percent },
   { name: "Configurações", href: "/admin/configuracoes", icon: Settings },

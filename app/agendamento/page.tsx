@@ -14,7 +14,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Calendar } from "@/components/ui/calendar"
 import { Separator } from "@/components/ui/separator"
-import { cn } from "@/lib/utils"
+import { cn, formatPrice } from "@/lib/utils"
 import { ptBR } from "date-fns/locale"
 import { TIME_SLOTS } from "@/lib/constants"
 import { getOccupiedSlots, createAppointment, getConsultationTypes, getCouponByCode } from "@/lib/services"
@@ -203,12 +203,18 @@ export default function AgendamentoPage() {
                             <Star className="w-3 h-3" /> Mais popular
                           </div>
                         )}
-                        <div className="text-4xl mb-4">{type.icon}</div>
+                        <div className="mb-4">
+                          {type.image ? (
+                            <img src={type.image} alt={type.name} className="w-full h-28 object-cover rounded-lg" />
+                          ) : (
+                            <div className="text-4xl">{type.icon}</div>
+                          )}
+                        </div>
                         <h3 className="text-lg font-semibold text-foreground mb-1">{type.name}</h3>
                         <p className="text-sm font-sans text-muted-foreground mb-4">{type.description}</p>
                         <div className="flex items-center justify-between">
                           <span className="text-xs font-sans text-muted-foreground flex items-center gap-1"><Clock className="w-3 h-3" /> {type.duration}</span>
-                          <span className="text-lg font-bold text-primary">R$ {type.price.toFixed(2).replace(".", ",")}</span>
+                          <span className="text-lg font-bold text-primary">R$ {formatPrice(type.price)}</span>
                         </div>
                       </motion.button>
                     ))}

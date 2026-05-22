@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import {
   ArrowLeft, User, Mail, Phone, Save, LogOut, Shield,
-  MapPin, Plus, Trash2, CreditCard, Home, Lock, KeyRound,
+  MapPin, Plus, Trash2, Home, Lock, KeyRound,
   AlertCircle, CheckCircle2, Loader2,
 } from "lucide-react"
 import { MoonIcon } from "@/components/moon-icon"
@@ -15,22 +15,22 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select"
 import { Separator } from "@/components/ui/separator"
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription,
 } from "@/components/ui/dialog"
-import { CreditCardDisplay } from "@/components/credit-card"
-import { CardBrandIcon } from "@/components/card-brand-icon"
 import { useAuth } from "@/lib/contexts/auth-context"
-import { getAddresses, createAddress, deleteAddress, getCards, createCard, deleteCard } from "@/lib/services"
+import { getAddresses, createAddress, deleteAddress } from "@/lib/services"
 import { doc, getDoc, setDoc, Timestamp } from "firebase/firestore"
 import { db } from "@/lib/firebase/config"
 import { lookupCep } from "@/lib/services/shipping"
-import { detectCardBrand, formatCardNumber, formatExpiry } from "@/lib/services/card-brand"
 import { toast } from "sonner"
-import type { UserAddress, SavedCard } from "@/lib/types"
+import type { UserAddress } from "@/lib/types"
 
 export default function ContaPage() {
   const { user, logout, loading } = useAuth()
@@ -39,9 +39,7 @@ export default function ContaPage() {
   const [phone, setPhone] = useState("")
   const [saving, setSaving] = useState(false)
   const [addresses, setAddresses] = useState<UserAddress[]>([])
-  const [cards, setCards] = useState<SavedCard[]>([])
   const [loadingAddr, setLoadingAddr] = useState(true)
-  const [loadingCards, setLoadingCards] = useState(true)
   const [tab, setTab] = useState("dados")
 
   useEffect(() => {
@@ -52,7 +50,6 @@ export default function ContaPage() {
         if (snap.exists() && snap.data().phone) setPhone(snap.data().phone)
       })
       getAddresses(user.id).then(setAddresses).finally(() => setLoadingAddr(false))
-      getCards(user.id).then(setCards).finally(() => setLoadingCards(false))
     }
   }, [user, loading, router])
 
@@ -125,7 +122,6 @@ export default function ContaPage() {
                 {[
                   { id: "dados", icon: User, label: "Dados Pessoais" },
                   { id: "enderecos", icon: MapPin, label: "Endereços", count: addresses.length },
-                  { id: "pagamentos", icon: CreditCard, label: "Pagamentos", count: cards.length },
                   { id: "seguranca", icon: Lock, label: "Segurança" },
                 ].map((item) => (
                   <button key={item.id} onClick={() => setTab(item.id)}
@@ -166,7 +162,6 @@ export default function ContaPage() {
                     {[
                       { id: "dados", icon: User, label: "Dados" },
                       { id: "enderecos", icon: MapPin, label: "Endereços" },
-                      { id: "pagamentos", icon: CreditCard, label: "Pagamentos" },
                       { id: "seguranca", icon: Lock, label: "Segurança" },
                     ].map((item) => (
                       <TabsTrigger key={item.id} value={item.id} className="flex-1 text-xs gap-1.5 py-2 font-sans">
@@ -187,13 +182,6 @@ export default function ContaPage() {
                   <Section key="enderecos">
                     <EnderecosSection uid={user.id} addresses={addresses} loading={loadingAddr} onRefresh={() =>
                       getAddresses(user.id).then(setAddresses)
-                    } />
-                  </Section>
-                )}
-                {tab === "pagamentos" && (
-                  <Section key="pagamentos">
-                    <PagamentosSection uid={user.id} cards={cards} loading={loadingCards} onRefresh={() =>
-                      getCards(user.id).then(setCards)
                     } />
                   </Section>
                 )}
@@ -326,61 +314,6 @@ function EnderecosSection({ uid, addresses, loading, onRefresh }: {
                   className="p-2 text-muted-foreground hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-all opacity-0 group-hover:opacity-100 cursor-pointer">
                   <Trash2 className="w-4 h-4" />
                 </button>
-              </motion.div>
-            ))}
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  )
-}
-
-// ─── Pagamentos ──────────────────────────────────────────
-
-function PagamentosSection({ uid, cards, loading, onRefresh }: {
-  uid: string; cards: SavedCard[]; loading: boolean; onRefresh: () => void
-}) {
-  return (
-    <Card className="bg-card border-border">
-      <CardHeader className="flex flex-row items-center justify-between flex-wrap gap-3">
-        <div>
-          <CardTitle className="text-lg font-semibold text-foreground flex items-center gap-2">
-            <CreditCard className="w-5 h-5 text-primary" /> Cartões Salvos
-          </CardTitle>
-          <CardDescription className="font-sans">Formas de pagamento salvas para check-in rápido</CardDescription>
-        </div>
-        <NewCardDialog uid={uid} onSave={onRefresh} />
-      </CardHeader>
-      <CardContent>
-        {loading ? (
-          <div className="space-y-3">
-            {[1, 2].map((i) => (
-              <div key={i} className="h-20 rounded-lg bg-secondary/50 animate-pulse" />
-            ))}
-          </div>
-        ) : cards.length === 0 ? (
-          <div className="text-center py-10">
-            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-secondary/50 flex items-center justify-center">
-              <CreditCard className="w-7 h-7 text-muted-foreground" />
-            </div>
-            <p className="text-foreground font-medium mb-1">Nenhum cartão salvo</p>
-            <p className="text-sm font-sans text-muted-foreground mb-4">Adicione um cartão para pagar mais rápido</p>
-            <NewCardDialog uid={uid} onSave={onRefresh} />
-          </div>
-        ) : (
-          <div className="grid sm:grid-cols-2 gap-3">
-            {cards.map((card, i) => (
-              <motion.div key={card.id} initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: i * 0.05 }}
-                className="group relative p-4 rounded-xl border border-border bg-card hover:border-primary/30 transition-all"
-              >
-                <button onClick={async () => { await deleteCard(uid, card.id); onRefresh(); toast.success("Cartão removido") }}
-                  className="absolute top-2 right-2 p-1.5 text-muted-foreground hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-all opacity-0 group-hover:opacity-100 cursor-pointer">
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
-                <CardBrandIcon brand={card.brand} className="w-14 h-9 mb-3 [&>div]:rounded-lg [&>div]:shadow-sm" />
-                <p className="text-sm font-medium text-foreground">{card.nickname} {card.isDefault && <Badge variant="outline" className="ml-1.5 text-[10px] font-sans text-primary border-primary/30">Padrão</Badge>}</p>
-                <p className="text-sm font-sans text-muted-foreground">•••• {card.last4}</p>
-                <p className="text-xs font-sans text-muted-foreground">{card.holderName} — Vence {String(card.expiryMonth).padStart(2, "0")}/{card.expiryYear}</p>
               </motion.div>
             ))}
           </div>
@@ -586,91 +519,4 @@ function NewAddressDialog({ uid, onSave }: { uid: string; onSave: () => void }) 
   )
 }
 
-// ─── New Card Dialog ─────────────────────────────────────
 
-function NewCardDialog({ uid, onSave }: { uid: string; onSave: () => void }) {
-  const [open, setOpen] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const [flipped, setFlipped] = useState(false)
-  const [form, setForm] = useState({ nickname: "", number: "", holder: "", expiry: "", cvv: "" })
-
-  const handleSave = async () => {
-    const cleanNum = form.number.replace(/\D/g, "")
-    const cleanExp = form.expiry.replace(/\D/g, "")
-    if (cleanNum.length < 13 || !form.holder || cleanExp.length !== 4 || form.cvv.length < 3) {
-      toast.error("Preencha todos os campos corretamente"); return
-    }
-    const brand = detectCardBrand(form.number)
-    setSaving(true)
-    try {
-      await createCard(uid, {
-        nickname: form.nickname || `${brand?.name || "Cartão"} •••• ${cleanNum.slice(-4)}`,
-        last4: cleanNum.slice(-4), brand: brand?.name || "Desconhecido",
-        holderName: form.holder.toUpperCase(),
-        expiryMonth: parseInt(cleanExp.slice(0, 2)), expiryYear: parseInt(cleanExp.slice(2)),
-        isDefault: false,
-      })
-      toast.success("Cartão salvo!"); setOpen(false); onSave()
-      setForm({ nickname: "", number: "", holder: "", expiry: "", cvv: "" })
-    } catch { toast.error("Erro ao salvar") }
-    finally { setSaving(false) }
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) { setFlipped(false); setForm({ nickname: "", number: "", holder: "", expiry: "", cvv: "" }) }}}>
-      <DialogTrigger asChild>
-        <Button size="sm" className="font-sans gap-1.5"><Plus className="w-4 h-4" /> Novo cartão</Button>
-      </DialogTrigger>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle>Adicionar Cartão</DialogTitle>
-          <DialogDescription className="font-sans">Seus dados são armazenados com segurança</DialogDescription>
-        </DialogHeader>
-        <div className="flex justify-center mb-6 -mx-6 scale-90 origin-center">
-          <CreditCardDisplay
-            number={formatCardNumber(form.number)}
-            holder={form.holder}
-            expiry={form.expiry}
-            cvv={form.cvv}
-            flipped={flipped}
-          />
-        </div>
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <Label className="font-sans text-sm">Apelido (opcional)</Label>
-            <Input value={form.nickname} onChange={(e) => setForm({ ...form, nickname: e.target.value })} placeholder="Ex: Meu Cartão" className="font-sans bg-input/50" />
-          </div>
-          <div className="space-y-2">
-            <Label className="font-sans text-sm">Número do cartão</Label>
-            <Input value={formatCardNumber(form.number)} onChange={(e) => setForm({ ...form, number: e.target.value.replace(/\D/g, "").slice(0, 16) })}
-              placeholder="0000 0000 0000 0000" className="font-sans bg-input/50" />
-          </div>
-          <div className="space-y-2">
-            <Label className="font-sans text-sm">Nome do titular</Label>
-            <Input value={form.holder} onChange={(e) => setForm({ ...form, holder: e.target.value.toUpperCase() })}
-              placeholder="Como está no cartão" className="font-sans bg-input/50 uppercase" />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2">
-              <Label className="font-sans text-sm">Validade</Label>
-              <Input value={formatExpiry(form.expiry)} onChange={(e) => setForm({ ...form, expiry: e.target.value.replace(/\D/g, "").slice(0, 4) })}
-                placeholder="MM/AA" maxLength={5} className="font-sans bg-input/50" onFocus={() => setFlipped(false)} />
-            </div>
-            <div className="space-y-2">
-              <Label className="font-sans text-sm">CVV</Label>
-              <Input value={form.cvv} onChange={(e) => setForm({ ...form, cvv: e.target.value.replace(/\D/g, "").slice(0, 4) })}
-                placeholder="•••" maxLength={4} className="font-sans bg-input/50" onFocus={() => setFlipped(true)} onBlur={() => setFlipped(false)} />
-            </div>
-          </div>
-          <div className="flex gap-3 pt-2">
-            <Button variant="outline" onClick={() => setOpen(false)} className="flex-1 font-sans">Cancelar</Button>
-            <Button onClick={handleSave} disabled={saving} className="flex-1 font-sans gap-2">
-              {saving && <Loader2 className="w-4 h-4 animate-spin" />}
-              {saving ? "Salvando..." : "Salvar"}
-            </Button>
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
-  )
-}

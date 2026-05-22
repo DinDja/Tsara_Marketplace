@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { motion, AnimatePresence } from "framer-motion"
-import { Menu, X, ShoppingBag, Calendar, User, LogOut, Settings } from "lucide-react"
+import { Menu, X, ShoppingCart, Calendar, User, LogOut, Settings } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 import { useCart } from "@/lib/contexts/cart-context"
@@ -63,7 +63,7 @@ export function Header() {
             ))}
           </div>
 
-          <div className="hidden md:flex items-center gap-4">
+          <div className="hidden md:flex items-center gap-8">
             {user ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -75,7 +75,7 @@ export function Header() {
                       <span className="text-sm font-sans text-foreground max-w-24 truncate">{user.name}</span>
                   </button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuContent align="end" className="w-48 mb-4">
                   <DropdownMenuItem asChild>
                     <Link href="/conta" className="gap-2 cursor-pointer"><User className="w-4 h-4" /> Minha Conta</Link>
                   </DropdownMenuItem>
@@ -83,7 +83,7 @@ export function Header() {
                     <Link href="/minhas-consultas" className="gap-2 cursor-pointer"><Calendar className="w-4 h-4" /> Minhas Consultas</Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
-                    <Link href="/meus-pedidos" className="gap-2 cursor-pointer"><ShoppingBag className="w-4 h-4" /> Meus Pedidos</Link>
+                    <Link href="/meus-pedidos" className="gap-2 cursor-pointer"><ShoppingCart className="w-4 h-4" /> Meus Pedidos</Link>
                   </DropdownMenuItem>
                   {user.role === "admin" && (
                     <DropdownMenuItem asChild>
@@ -103,7 +103,7 @@ export function Header() {
             )}
             <Link href="/carrinho" className="relative">
               <Button variant="ghost" size="icon" className="text-foreground hover:text-gold hover:bg-gold/10 relative">
-                <ShoppingBag className="w-5 h-5" />
+                <ShoppingCart className="w-5 h-5" />
                 {hydrated && itemCount > 0 && (
                   <span className="absolute -top-1.5 -right-1.5 bg-gold text-background text-[10px] font-bold font-sans w-5 h-5 rounded-full flex items-center justify-center">
                     {itemCount > 9 ? "9+" : itemCount}
@@ -119,7 +119,7 @@ export function Header() {
             </Link>
           </div>
 
-          <button className="md:hidden p-2 text-foreground" onClick={() => setIsOpen(!isOpen)} aria-label="Menu">
+          <button className="md:hidden p-2 text-foreground mt-4" onClick={() => setIsOpen(!isOpen)} aria-label="Menu">
             {isOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
           </button>
         </div>
@@ -139,7 +139,7 @@ export function Header() {
                       </motion.div>
                     ))}
                   </div>
-                  <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="pt-10 space-y-3">
+                  <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="pt-10 space-y-6">
                     {user ? (
                       <>
                         <div className="flex items-center gap-3 px-2 mb-4">
@@ -164,7 +164,7 @@ export function Header() {
                         </Link>
                         <Link href="/meus-pedidos" onClick={() => setIsOpen(false)}>
                           <Button variant="outline" className="w-full border-border text-foreground hover:bg-gold/10 justify-start gap-2">
-                            <ShoppingBag className="w-4 h-4" /> Meus Pedidos
+                            <ShoppingCart className="w-4 h-4" /> Meus Pedidos
                           </Button>
                         </Link>
                         {user.role === "admin" && (
@@ -187,7 +187,7 @@ export function Header() {
                     <div className="flex gap-3">
                       <Link href="/carrinho" className="flex-1" onClick={() => setIsOpen(false)}>
                         <Button variant="outline" className="w-full border-gold/50 text-gold hover:bg-gold/10">
-                          <ShoppingBag className="w-4 h-4 mr-2" />
+                          <ShoppingCart className="w-4 h-4 mr-2" />
                           Carrinho{hydrated && itemCount > 0 && ` (${itemCount})`}
                         </Button>
                       </Link>

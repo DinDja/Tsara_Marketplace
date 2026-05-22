@@ -13,6 +13,7 @@ export interface Product {
   status: "active" | "inactive" | "low_stock"
   featured: boolean
   description?: string
+  freeShipping?: boolean
   createdAt: Date
   updatedAt: Date
 }
@@ -84,6 +85,8 @@ export interface CartItem {
   price: number
   quantity: number
   image: string
+  freeShipping?: boolean
+  status?: string
 }
 
 export interface Order {
@@ -99,6 +102,11 @@ export interface Order {
   shippingAddress?: string
   paymentMethod?: string
   status: "pending" | "processing" | "shipped" | "delivered" | "cancelled"
+  orderNsu?: string
+  checkoutUrl?: string
+  transactionNsu?: string
+  paidAmount?: number
+  captureMethod?: string
   createdAt: Date
   updatedAt: Date
 }
@@ -156,6 +164,7 @@ export interface SavedCard {
   holderName: string
   expiryMonth: number
   expiryYear: number
+  type: "credit" | "debit"
   isDefault: boolean
   createdAt: Date
 }

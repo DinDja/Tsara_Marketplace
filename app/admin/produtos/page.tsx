@@ -24,7 +24,7 @@ import { useProducts } from "@/lib/hooks";
 import { useAsyncMutation } from "@/lib/hooks/useAsync";
 import { createProduct, updateProduct, deleteProduct } from "@/lib/services";
 import { fileToBase64 } from "@/lib/image";
-import { cn } from "@/lib/utils";
+import { cn, formatPrice } from "@/lib/utils";
 import { toast } from "sonner";
 import type { Product, ProductCategory } from "@/lib/types";
 
@@ -33,6 +33,7 @@ const categories = ["Todos", "Cristais", "Velas", "Oráculos", "Incensos", "Aces
 const emptyForm = {
   name: "", category: "Cristais" as ProductCategory, price: 0, originalPrice: 0,
   stock: 0, description: "", featured: false, badge: "", image: "", status: "active" as Product["status"],
+  freeShipping: false,
 };
 
 export default function AdminProdutos() {
@@ -43,9 +44,11 @@ export default function AdminProdutos() {
   const [editing, setEditing] = useState<Product | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
+  const [priceStr, setPriceStr] = useState("");
+  const [origPriceStr, setOrigPriceStr] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const resetForm = () => { setForm(emptyForm); setEditing(null) };
+  const resetForm = () => { setForm(emptyForm); setPriceStr(""); setOrigPriceStr(""); setEditing(null) };
 
   const openEdit = (p: Product) => {
     setEditing(p);
@@ -54,7 +57,10 @@ export default function AdminProdutos() {
       originalPrice: p.originalPrice ?? 0, stock: p.stock,
       description: p.description ?? "", featured: p.featured,
       badge: p.badge ?? "", image: p.image ?? "", status: p.status,
+      freeShipping: p.freeShipping ?? false,
     });
+    setPriceStr(p.price.toFixed(2).replace(".", ","));
+    setOrigPriceStr(p.originalPrice ? p.originalPrice.toFixed(2).replace(".", ",") : "");
     setOpen(true);
   };
 
@@ -144,11 +150,27 @@ export default function AdminProdutos() {
                 </div>
                 <div className="space-y-2">
                   <Label className="font-sans">Preço (R$)</Label>
-                  <Input type="number" value={form.price || ""} onChange={(e) => setForm({ ...form, price: Number(e.target.value) })} className="font-sans bg-input/50" />
+                  <Input type="text" inputMode="decimal"
+                    value={priceStr}
+                    onChange={(e) => {
+                      const raw = e.target.value.replace(/[^0-9,.]/g, "")
+                      const parts = raw.split(/[,.]/)
+                      const clean = parts[0] + (parts.length > 1 ? "," + parts.slice(1).join("") : "")
+                      setPriceStr(clean); setForm({ ...form, price: parseFloat(clean.replace(",", ".")) || 0 })
+                    }}
+                    placeholder="0,00" className="font-sans bg-input/50" />
                 </div>
                 <div className="space-y-2">
                   <Label className="font-sans">Preço original (R$)</Label>
-                  <Input type="number" value={form.originalPrice || ""} onChange={(e) => setForm({ ...form, originalPrice: Number(e.target.value) })} className="font-sans bg-input/50" />
+                  <Input type="text" inputMode="decimal"
+                    value={origPriceStr}
+                    onChange={(e) => {
+                      const raw = e.target.value.replace(/[^0-9,.]/g, "")
+                      const parts = raw.split(/[,.]/)
+                      const clean = parts[0] + (parts.length > 1 ? "," + parts.slice(1).join("") : "")
+                      setOrigPriceStr(clean); setForm({ ...form, originalPrice: parseFloat(clean.replace(",", ".")) || 0 })
+                    }}
+                    placeholder="0,00" className="font-sans bg-input/50" />
                 </div>
                 <div className="space-y-2">
                   <Label className="font-sans">Estoque</Label>
@@ -167,6 +189,10 @@ export default function AdminProdutos() {
               <div className="flex items-center gap-3">
                 <Switch checked={form.featured} onCheckedChange={(v) => setForm({ ...form, featured: v })} />
                 <Label className="font-sans">Produto em destaque</Label>
+              </div>
+              <div className="flex items-center gap-3">
+                <Switch checked={form.freeShipping} onCheckedChange={(v) => setForm({ ...form, freeShipping: v })} />
+                <Label className="font-sans">Frete grátis</Label>
               </div>
               <div className="space-y-2">
                 <Label className="font-sans">Descrição</Label>
@@ -274,7 +300,7 @@ export default function AdminProdutos() {
                           </div>
                         </td>
                         <td className="py-4 px-6"><span className="text-sm font-sans text-muted-foreground">{product.category}</span></td>
-                        <td className="py-4 px-6 text-right"><span className="text-sm font-sans font-medium text-foreground">R$ {product.price.toFixed(2).replace(".", ",")}</span></td>
+                        <td className="py-4 px-6 text-right"><span className="text-sm font-sans font-medium text-foreground">R$ {formatPrice(product.price)}</span></td>
                         <td className="py-4 px-6 text-right">
                           <span className={cn("text-sm font-sans font-medium", product.stock === 0 ? "text-red-500" : product.stock < 10 ? "text-yellow-500" : "text-foreground")}>{product.stock} un.</span>
                         </td>

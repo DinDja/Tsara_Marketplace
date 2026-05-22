@@ -23,6 +23,7 @@ function mapDoc(d: any): Product {
     sold: data.sold ?? 0,
     status: data.status ?? "active",
     featured: data.featured ?? false,
+    freeShipping: data.freeShipping ?? false,
     description: data.description,
     createdAt: data.createdAt?.toDate?.() ?? new Date(),
     updatedAt: data.updatedAt?.toDate?.() ?? new Date(),

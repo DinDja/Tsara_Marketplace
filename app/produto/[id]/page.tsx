@@ -5,7 +5,7 @@ import Link from "next/link"
 import { useParams } from "next/navigation"
 import { motion } from "framer-motion"
 import {
-  ArrowLeft, ShoppingBag, Star, Clock, Package,
+  ArrowLeft, ShoppingCart, Star, Clock, Package,
   Truck, Shield, ChevronDown, ChevronUp,
 } from "lucide-react"
 import { MoonIcon } from "@/components/moon-icon"
@@ -20,7 +20,7 @@ import { useCart } from "@/lib/contexts/cart-context"
 import { useAuth } from "@/lib/contexts/auth-context"
 import { getReviews, createReview } from "@/lib/services"
 import { toast } from "sonner"
-import { cn } from "@/lib/utils"
+import { cn, formatPrice } from "@/lib/utils"
 import type { Review } from "@/lib/types"
 
 const ratingLabels = ["Péssimo", "Ruim", "Regular", "Bom", "Excelente"]
@@ -144,20 +144,26 @@ export default function ProdutoDetalhe() {
             </div>
 
             <div className="flex items-baseline gap-3">
-              <span className="text-4xl font-bold text-primary">R$ {product.price.toFixed(2).replace(".", ",")}</span>
-              {product.originalPrice && (
-                <span className="text-lg text-muted-foreground line-through font-sans">R$ {product.originalPrice.toFixed(2).replace(".", ",")}</span>
-              )}
+              <span className="text-4xl font-bold text-primary">R$ {formatPrice(product.price)}</span>
+              {product.originalPrice ? (
+                <span className="text-lg text-muted-foreground line-through font-sans">R$ {formatPrice(product.originalPrice)}</span>
+              ) : null}
             </div>
 
-            <div className="flex items-center gap-4 text-sm font-sans text-muted-foreground">
-              <div className="flex items-center gap-1.5"><Package className="w-4 h-4" /> Estoque: {product.stock} un.</div>
-              <div className="flex items-center gap-1.5"><ShoppingBag className="w-4 h-4" /> {product.sold} vendidos</div>
+            <div className="flex items-center gap-4 text-sm font-sans text-muted-foreground flex-wrap">
+              {product.stock === 0 ? (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-500/10 text-red-500 font-medium text-xs">Esgotado</span>
+              ) : product.stock <= 5 ? (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-yellow-500/10 text-yellow-500 font-medium text-xs">Acabando ({product.stock} un.)</span>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-500/10 text-green-500 font-medium text-xs">Em estoque ({product.stock} un.)</span>
+              )}
+              <div className="flex items-center gap-1.5"><ShoppingCart className="w-4 h-4" /> {product.sold} vendidos</div>
             </div>
 
             <Button onClick={() => { addItem(product); toast.success(`${product.name} adicionado ao carrinho!`) }}
               className="w-full h-12 bg-primary hover:bg-primary/90 text-base font-sans gap-2">
-              <ShoppingBag className="w-5 h-5" /> Adicionar ao Carrinho
+              <ShoppingCart className="w-5 h-5" /> Adicionar ao Carrinho
             </Button>
 
             <div className="flex items-center gap-6 text-xs font-sans text-muted-foreground pt-2">

@@ -10,6 +10,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { formatPrice } from "@/lib/utils"
 import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
 import {
@@ -36,9 +37,11 @@ export default function AdminConsultas() {
   const [editing, setEditing] = useState<ConsultationType | null>(null)
   const [form, setForm] = useState(defaultForm)
   const [saving, setSaving] = useState(false)
+  const [priceStr, setPriceStr] = useState("")
+  const [origPriceStr, setOrigPriceStr] = useState("")
   const fileRef = useRef<HTMLInputElement>(null)
 
-  const resetForm = () => { setForm(defaultForm); setEditing(null) }
+  const resetForm = () => { setForm(defaultForm); setPriceStr(""); setOrigPriceStr(""); setEditing(null) }
 
   const openEdit = (t: ConsultationType) => {
     setEditing(t)
@@ -48,6 +51,8 @@ export default function AdminConsultas() {
       features: t.features.length ? t.features : [""],
       popular: t.popular, icon: t.icon, image: t.image ?? "",
     })
+    setPriceStr(t.price.toFixed(2).replace(".", ","))
+    setOrigPriceStr(t.originalPrice ? t.originalPrice.toFixed(2).replace(".", ",") : "")
     setOpen(true)
   }
 
@@ -71,11 +76,12 @@ export default function AdminConsultas() {
     if (!form.name || form.price <= 0) { toast.error("Preencha nome e preço"); return }
     setSaving(true)
     try {
-      const payload = {
+      const payload: Record<string, any> = {
         ...form,
         originalPrice: form.originalPrice > 0 ? form.originalPrice : undefined,
         features: form.features.filter(Boolean),
       }
+      Object.keys(payload).forEach((k) => { if (payload[k] === undefined) delete payload[k] })
       if (editing) {
         await updateConsultationType(editing.id, payload)
         toast.success("Tipo de consulta atualizado!")
@@ -124,11 +130,27 @@ export default function AdminConsultas() {
                 </div>
                 <div className="space-y-2">
                   <Label className="font-sans">Preço (R$)</Label>
-                  <Input type="number" value={form.price || ""} onChange={(e) => setForm({ ...form, price: Number(e.target.value) })} className="font-sans bg-input/50" />
+                  <Input type="text" inputMode="decimal"
+                    value={priceStr}
+                    onChange={(e) => {
+                      const raw = e.target.value.replace(/[^0-9,.]/g, "")
+                      const parts = raw.split(/[,.]/)
+                      const clean = parts[0] + (parts.length > 1 ? "," + parts.slice(1).join("") : "")
+                      setPriceStr(clean); setForm({ ...form, price: parseFloat(clean.replace(",", ".")) || 0 })
+                    }}
+                    placeholder="0,00" className="font-sans bg-input/50" />
                 </div>
                 <div className="space-y-2">
                   <Label className="font-sans">Preço original (opcional)</Label>
-                  <Input type="number" value={form.originalPrice || ""} onChange={(e) => setForm({ ...form, originalPrice: Number(e.target.value) })} className="font-sans bg-input/50" />
+                  <Input type="text" inputMode="decimal"
+                    value={origPriceStr}
+                    onChange={(e) => {
+                      const raw = e.target.value.replace(/[^0-9,.]/g, "")
+                      const parts = raw.split(/[,.]/)
+                      const clean = parts[0] + (parts.length > 1 ? "," + parts.slice(1).join("") : "")
+                      setOrigPriceStr(clean); setForm({ ...form, originalPrice: parseFloat(clean.replace(",", ".")) || 0 })
+                    }}
+                    placeholder="0,00" className="font-sans bg-input/50" />
                 </div>
                 <div className="space-y-2">
                   <Label className="font-sans">Ícone</Label>
@@ -221,8 +243,8 @@ export default function AdminConsultas() {
                           </span>
                         </td>
                         <td className="py-4 px-6 text-right">
-                          <span className="text-sm font-sans font-medium text-foreground">R$ {t.price.toFixed(2).replace(".", ",")}</span>
-                          {t.originalPrice && <span className="text-xs text-muted-foreground line-through ml-1">R$ {t.originalPrice.toFixed(2).replace(".", ",")}</span>}
+                          <span className="text-sm font-sans font-medium text-foreground">R$ {formatPrice(t.price)}</span>
+                          {t.originalPrice ? <span className="text-xs text-muted-foreground line-through ml-1">R$ {formatPrice(t.originalPrice)}</span> : null}
                         </td>
                         <td className="py-4 px-6 text-center">
                           {t.popular ? <MoonIcon className="w-4 h-4 text-yellow-500 inline" /> : <span className="text-muted-foreground text-xs font-sans">—</span>}
