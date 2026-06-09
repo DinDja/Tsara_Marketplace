@@ -109,7 +109,7 @@ export function Products() {
             viewport={{ once: true }}
             className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8"
           >
-            {products.map((product, index) => (
+            {products.slice(0, 3).map((product, index) => (
                 <motion.div
                   key={product.id}
                   initial={{ opacity: 0, y: 30 }}
@@ -157,9 +157,14 @@ export function Products() {
                           ({product.reviews})
                         </span>
                       </div>
-                      <h3 className="text-lg font-light text-foreground mb-3 group-hover:text-gold transition-colors">
+                      <h3 className="text-lg font-light text-foreground mb-2 group-hover:text-gold transition-colors">
                         {product.name}
                       </h3>
+                      {product.description && (
+                        <p className="text-sm text-muted-foreground font-sans line-clamp-2 mb-3">
+                          {product.description}
+                        </p>
+                      )}
                       <div className="flex items-baseline gap-2">
                         <span className="text-xl text-gold font-sans font-medium">
                           R$ {formatPrice(product.price)}

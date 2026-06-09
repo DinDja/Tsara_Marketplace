@@ -7,6 +7,7 @@ import { Clock, Video, Phone, MapPin, Check, ArrowRight, Loader2 } from "lucide-
 import { Button } from "@/components/ui/button"
 import { MoonIcon } from "@/components/moon-icon"
 import { Card } from "@/components/ui/card"
+import Link from "next/link"
 import { getConsultationTypes } from "@/lib/services"
 import { formatPrice } from "@/lib/utils"
 import type { ConsultationType } from "@/lib/services/consultations"
@@ -77,7 +78,7 @@ export function Consultations() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
-            {types.map((consultation, index) => (
+            {types.slice(0, 3).map((consultation, index) => (
               <motion.div
                 key={consultation.id}
                 initial={{ opacity: 0, y: 30 }}
@@ -114,7 +115,7 @@ export function Consultations() {
                   <h3 className="text-2xl font-light text-foreground mb-3">
                     {consultation.name}
                   </h3>
-                  <p className="text-muted-foreground font-sans text-sm leading-relaxed mb-6">
+                  <p className="text-muted-foreground font-sans text-sm leading-relaxed mb-6 line-clamp-2">
                     {consultation.description}
                   </p>
 
@@ -167,7 +168,25 @@ export function Consultations() {
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          className="mt-16 text-center"
+          className="mt-12 text-center"
+        >
+          <Link href="/consultas">
+            <Button
+              variant="outline"
+              size="lg"
+              className="border-gold/30 text-gold hover:bg-gold/10 tracking-wider font-sans group"
+            >
+              Ver Todas as Consultas
+              <ArrowRight className="w-4 h-4 ml-2 transition-transform group-hover:translate-x-1" />
+            </Button>
+          </Link>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          className="mt-6 text-center"
         >
           <p className="text-sm text-muted-foreground font-sans">
             Primeira vez? <span className="text-gold cursor-pointer hover:underline">Ganhe 15% de desconto</span> na sua primeira consulta.
