@@ -1,481 +1,605 @@
 "use client"
 
-import { useState, useMemo, useEffect, useCallback } from "react"
+import { Suspense, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
+import { useSearchParams } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import {
-  ArrowLeft, Clock, Calendar as CalendarIcon, User, Phone,
-  Mail, MessageSquare, CheckCircle2, Star, Loader2, Tag,
+  ArrowLeft,
+  Loader2,
+  Mail,
+  MessageSquare,
+  Phone,
+  Tag,
+  User,
 } from "lucide-react"
+import { doc, getDoc } from "firebase/firestore"
+import { db } from "@/lib/firebase/config"
 import { MoonIcon } from "@/components/moon-icon"
 import { Button } from "@/components/ui/button"
+import { LiquidGlassCard } from "@/components/ui/liquid-glass-card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Calendar } from "@/components/ui/calendar"
-import { Separator } from "@/components/ui/separator"
-import { cn, formatPrice } from "@/lib/utils"
-import { ptBR } from "date-fns/locale"
+import {
+  BookingConfirmation,
+  BookingSummary,
+  DatePickerSection,
+  EmptyScheduleState,
+  SchedulingStepLayout,
+  SchedulingTypeCard,
+  TimeSlotSelector,
+} from "@/components/scheduling"
 import { TIME_SLOTS } from "@/lib/constants"
-import { getOccupiedSlots, createAppointment, getConsultationTypes, getCouponByCode } from "@/lib/services"
-import { doc, getDoc } from "firebase/firestore"
-import { db } from "@/lib/firebase/config"
+import { cn } from "@/lib/utils"
+import { createAppointment, getConsultationTypes, getCouponByCode, getOccupiedSlots } from "@/lib/services"
 import { useAuth } from "@/lib/contexts/auth-context"
 import { toast } from "sonner"
-import type { TimeSlot } from "@/lib/types"
+import type { Coupon, TimeSlot } from "@/lib/types"
 import type { ConsultationType } from "@/lib/services/consultations"
-import type { Coupon } from "@/lib/types"
 
-export default function AgendamentoPage() {
+const steps = [
+  { id: 1, label: "Tipo" },
+  { id: 2, label: "Data" },
+  { id: 3, label: "Horario" },
+  { id: 4, label: "Dados" },
+  { id: 5, label: "Revisao" },
+  { id: 6, label: "Sucesso" },
+]
+
+function toDateKey(date: Date) {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, "0")
+  const day = String(date.getDate()).padStart(2, "0")
+  return `${year}-${month}-${day}`
+}
+
+function isPastDate(date: Date) {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const target = new Date(date)
+  target.setHours(0, 0, 0, 0)
+  return target < today
+}
+
+function isToday(date: Date) {
+  const today = new Date()
+  return toDateKey(today) === toDateKey(date)
+}
+
+function isValidEmail(email: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+}
+
+function isValidPhone(phone: string) {
+  return phone.replace(/\D/g, "").length >= 10
+}
+
+function AgendamentoContent() {
   const { user } = useAuth()
+  const searchParams = useSearchParams()
+  const preselectedTypeId = searchParams.get("type")
+
   const [step, setStep] = useState(1)
   const [consultationTypes, setConsultationTypes] = useState<ConsultationType[]>([])
   const [loadingTypes, setLoadingTypes] = useState(true)
+  const [typesError, setTypesError] = useState<string | null>(null)
   const [selectedType, setSelectedType] = useState<ConsultationType | null>(null)
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined)
   const [selectedTime, setSelectedTime] = useState<string | null>(null)
   const [occupiedSlots, setOccupiedSlots] = useState<string[]>([])
   const [loadingSlots, setLoadingSlots] = useState(false)
+  const [slotError, setSlotError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [formData, setFormData] = useState({ name: "", email: "", phone: "", message: "" })
-  // Coupon state
   const [couponCode, setCouponCode] = useState("")
   const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null)
   const [couponLoading, setCouponLoading] = useState(false)
 
   useEffect(() => {
-    getConsultationTypes().then((data) => { setConsultationTypes(data); setLoadingTypes(false) })
-  }, [])
+    let mounted = true
+    getConsultationTypes()
+      .then((data) => {
+        if (!mounted) return
+        setConsultationTypes(data)
+        const preselected = data.find((type) => type.id === preselectedTypeId)
+        if (preselected) {
+          setSelectedType(preselected)
+          setStep(2)
+        }
+      })
+      .catch(() => {
+        if (mounted) setTypesError("Nao foi possivel carregar os tipos de consulta.")
+      })
+      .finally(() => {
+        if (mounted) setLoadingTypes(false)
+      })
+    return () => { mounted = false }
+  }, [preselectedTypeId])
 
-  // Auto-fill user data
   useEffect(() => {
-    if (user) {
-      setFormData((prev) => ({
-        ...prev,
-        name: prev.name || user.name,
-        email: prev.email || user.email,
-      }))
-      if (!formData.phone) {
-        getDoc(doc(db, "users", user.id)).then((snap) => {
-          if (snap.exists() && snap.data().phone) {
-            setFormData((prev) => ({ ...prev, phone: snap.data().phone }))
-          }
-        })
-      }
-    }
+    if (!user) return
+
+    setFormData((prev) => ({
+      ...prev,
+      name: prev.name || user.name,
+      email: prev.email || user.email,
+    }))
+
+    getDoc(doc(db, "users", user.id)).then((snap) => {
+      const phone = snap.exists() ? snap.data().phone : ""
+      if (phone) setFormData((prev) => ({ ...prev, phone: prev.phone || phone }))
+    })
   }, [user])
 
   useEffect(() => {
-    if (!selectedDate) { setOccupiedSlots([]); return }
-    const dateKey = selectedDate.toISOString().split("T")[0]
+    if (!selectedDate) {
+      setOccupiedSlots([])
+      setSlotError(null)
+      return
+    }
+
+    let mounted = true
     setLoadingSlots(true)
-    getOccupiedSlots(dateKey).then((slots) => { setOccupiedSlots(slots); setLoadingSlots(false) })
+    setSlotError(null)
+    getOccupiedSlots(toDateKey(selectedDate))
+      .then((slots) => {
+        if (mounted) setOccupiedSlots(slots)
+      })
+      .catch(() => {
+        if (mounted) setSlotError("Nao foi possivel carregar a disponibilidade.")
+      })
+      .finally(() => {
+        if (mounted) setLoadingSlots(false)
+      })
+    return () => { mounted = false }
   }, [selectedDate])
 
   const price = selectedType?.price ?? 0
   const discount = appliedCoupon ? price * (appliedCoupon.discount / 100) : 0
-  const finalPrice = price - discount
-
-  const isToday = useCallback((date: Date) => {
-    const t = new Date(); t.setHours(0, 0, 0, 0)
-    const d = new Date(date); d.setHours(0, 0, 0, 0)
-    return t.getTime() === d.getTime()
-  }, [])
+  const finalPrice = Math.max(0, price - discount)
 
   const timeSlots = useMemo((): TimeSlot[] => {
     const now = new Date()
     const currentHour = now.getHours()
     const currentMin = now.getMinutes()
+
     return TIME_SLOTS.map((time) => {
-      const [h, m] = time.split(":").map(Number)
-      const past = selectedDate && isToday(selectedDate) && (h < currentHour || (h === currentHour && m <= currentMin))
-      return { time, available: !occupiedSlots.includes(time) && !past }
+      const [hour, minute] = time.split(":").map(Number)
+      const past = selectedDate && isToday(selectedDate) && (hour < currentHour || (hour === currentHour && minute <= currentMin))
+      return {
+        time,
+        available: Boolean(selectedDate) && !occupiedSlots.includes(time) && !past,
+      }
     })
-  }, [occupiedSlots, selectedDate, isToday])
+  }, [occupiedSlots, selectedDate])
 
-  const availableSlots = timeSlots.filter((slot) => slot.available)
-  const occupiedCount = timeSlots.length - availableSlots.length
+  const canContinue = {
+    1: !!selectedType,
+    2: !!selectedDate,
+    3: !!selectedTime,
+    4: formData.name.trim().length >= 2 && isValidEmail(formData.email) && isValidPhone(formData.phone),
+    5: !!selectedType && !!selectedDate && !!selectedTime && !submitting,
+  }
 
-  const isWeekend = (date: Date) => date.getDay() === 0
-  const isPastDate = (date: Date) => { const t = new Date(); t.setHours(0, 0, 0, 0); return date < t }
+  const selectedDateLabel = selectedDate?.toLocaleDateString("pt-BR", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  })
 
   const applyCoupon = async () => {
-    if (!couponCode.trim()) { toast.error("Digite um código"); return }
+    if (!couponCode.trim()) {
+      toast.error("Digite um codigo de cupom.")
+      return
+    }
     setCouponLoading(true)
     try {
       const coupon = await getCouponByCode(couponCode)
-      if (!coupon) { toast.error("Cupom inválido"); return }
-      if (!coupon.active) { toast.error("Cupom inativo"); return }
-      if (coupon.expiresAt && new Date(coupon.expiresAt) < new Date()) { toast.error("Cupom expirado"); return }
-      if (coupon.maxUses && coupon.usedCount >= coupon.maxUses) { toast.error("Cupom esgotado"); return }
-      if (coupon.minPurchase && price < coupon.minPurchase) { toast.error(`Valor mínimo: R$ ${coupon.minPurchase.toFixed(2).replace(".", ",")}`); return }
+      if (!coupon) {
+        toast.error("Cupom nao encontrado.")
+        return
+      }
+      if (!coupon.active) {
+        toast.error("Este cupom esta inativo.")
+        return
+      }
+      if (coupon.expiresAt && new Date(coupon.expiresAt) < new Date()) {
+        toast.error("Este cupom expirou.")
+        return
+      }
+      if (coupon.maxUses && coupon.usedCount >= coupon.maxUses) {
+        toast.error("Este cupom ja atingiu o limite de uso.")
+        return
+      }
+      if (coupon.minPurchase && price < coupon.minPurchase) {
+        toast.error(`Valor minimo para este cupom: R$ ${coupon.minPurchase.toFixed(2).replace(".", ",")}`)
+        return
+      }
       setAppliedCoupon(coupon)
-      toast.success(`Cupom aplicado! ${coupon.discount}% de desconto`)
-    } catch { toast.error("Erro ao validar cupom") }
-    finally { setCouponLoading(false) }
+      toast.success(`Cupom aplicado: ${coupon.discount}% de desconto.`)
+    } catch {
+      toast.error("Nao foi possivel validar o cupom agora.")
+    } finally {
+      setCouponLoading(false)
+    }
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!selectedType || !selectedDate || !selectedTime) return
+  const continueFromStep = (targetStep: number) => {
+    if (targetStep === 2 && !canContinue[1]) {
+      toast.error("Escolha um tipo de consulta para continuar.")
+      return
+    }
+    if (targetStep === 3 && !canContinue[2]) {
+      toast.error("Escolha uma data para continuar.")
+      return
+    }
+    if (targetStep === 4 && !canContinue[3]) {
+      toast.error("Escolha um horario livre para continuar.")
+      return
+    }
+    if (targetStep === 5 && !canContinue[4]) {
+      toast.error("Confira nome, email e WhatsApp antes de continuar.")
+      return
+    }
+    setStep(targetStep)
+  }
+
+  const handleSubmit = async () => {
+    if (!selectedType || !selectedDate || !selectedTime) {
+      toast.error("Revise tipo, data e horario antes de confirmar.")
+      return
+    }
+    if (!canContinue[4]) {
+      toast.error("Preencha seus dados corretamente.")
+      setStep(4)
+      return
+    }
+
     setSubmitting(true)
     try {
       const payload: Record<string, any> = {
         clientId: user?.id,
-        client: formData.name,
-        email: formData.email,
-        phone: formData.phone,
+        client: formData.name.trim(),
+        email: formData.email.trim().toLowerCase(),
+        phone: formData.phone.trim(),
         type: selectedType.id,
         typeName: selectedType.name,
-        date: selectedDate.toISOString().split("T")[0],
+        date: toDateKey(selectedDate),
         time: selectedTime,
         status: "pending",
         price: finalPrice,
         coupon: appliedCoupon?.code,
-        message: formData.message || undefined,
+        message: formData.message.trim() || undefined,
       }
-      Object.keys(payload).forEach((k) => { if (payload[k] === undefined) delete payload[k] })
+
+      Object.keys(payload).forEach((key) => { if (payload[key] === undefined) delete payload[key] })
       await createAppointment(payload as any)
-      setStep(4)
-      toast.success("Agendamento confirmado!", {
-        description: `Sua consulta de ${selectedType.name} foi agendada com sucesso.`,
-      })
+      setStep(6)
+      toast.success("Solicitacao de agendamento enviada.")
     } catch (err: any) {
-      const code = err?.code || ""
-      if (code.includes("permission-denied")) {
-        toast.error("As regras do Firestore precisam ser atualizadas. Peça ao admin para fazer deploy.")
+      const message = String(err?.message || "")
+      if (message.includes("slot-unavailable")) {
+        toast.error("Esse horario acabou de ser reservado. Escolha outro horario.")
+        if (selectedDate) {
+          const slots = await getOccupiedSlots(toDateKey(selectedDate))
+          setOccupiedSlots(slots)
+        }
+        setSelectedTime(null)
+        setStep(3)
+      } else if (err?.code?.includes("permission-denied")) {
+        toast.error("Nao foi possivel gravar o agendamento por permissao do Firestore.")
       } else {
-        toast.error(`Erro ao agendar (${code || "desconhecido"}). Tente novamente.`)
+        toast.error("Nao foi possivel confirmar agora. Tente novamente em instantes.")
       }
-    } finally { setSubmitting(false) }
+    } finally {
+      setSubmitting(false)
+    }
   }
 
-  const canProceedToStep2 = selectedType !== null
-  const canProceedToStep3 = selectedDate !== undefined && selectedTime !== null
+  const summary = (
+    <BookingSummary
+      type={selectedType}
+      selectedDate={selectedDate}
+      selectedTime={selectedTime}
+      price={price}
+      discount={discount}
+      finalPrice={finalPrice}
+      coupon={appliedCoupon}
+      message={formData.message}
+    />
+  )
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <Link href="/" className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors">
-              <ArrowLeft className="w-4 h-4" /><span className="font-sans text-sm">Voltar</span>
+      <header className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur-xl">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="flex h-16 items-center justify-between">
+            <Link href="/consultas" className="flex items-center gap-2 text-muted-foreground transition-colors hover:text-foreground">
+              <ArrowLeft className="h-4 w-4" />
+              <span className="text-sm font-sans">Consultas</span>
             </Link>
             <Link href="/" className="flex items-center gap-2">
-              <MoonIcon className="w-6 h-6 text-primary" /><span className="text-xl font-bold text-foreground">Tsara</span>
+              <MoonIcon className="h-6 w-6 text-primary" />
+              <span className="text-xl font-bold text-foreground">Tsara</span>
             </Link>
             <div className="w-20" />
           </div>
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
-        <div className="flex items-center justify-center mb-12">
-          {[1, 2, 3].map((s) => (
-            <div key={s} className="flex items-center">
-              <div className={cn("w-10 h-10 rounded-full flex items-center justify-center font-sans font-medium transition-all", step >= s ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground")}>
-                {step > s ? <CheckCircle2 className="w-5 h-5" /> : s}
-              </div>
-              {s < 3 && <div className={cn("w-16 lg:w-24 h-1 mx-2 rounded-full transition-all", step > s ? "bg-primary" : "bg-secondary")} />}
-            </div>
-          ))}
-        </div>
-
+      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-12">
         <AnimatePresence mode="wait">
           {step === 1 && (
-            <motion.div key="step1" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.3 }}>
-              <div className="text-center mb-8">
-                <h1 className="text-3xl lg:text-4xl font-bold text-foreground mb-2">Escolha sua Consulta</h1>
-                <p className="text-muted-foreground font-sans">Selecione o tipo de consulta que deseja agendar</p>
-              </div>
-              {loadingTypes ? (
-                <div className="flex justify-center py-20"><Loader2 className="w-8 h-8 text-primary animate-spin" /></div>
-              ) : (
-                <div className="space-y-8">
-                  <div className="grid md:grid-cols-3 gap-4 lg:gap-6">
+            <motion.div key="step-type" initial={{ opacity: 0, x: 18 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -18 }}>
+              <SchedulingStepLayout
+                steps={steps}
+                currentStep={step}
+                title="Escolha sua consulta"
+                description="Selecione o atendimento que melhor combina com o momento que voce quer investigar."
+                footer={
+                  <Button onClick={() => continueFromStep(2)} disabled={!canContinue[1]} className="h-11 px-8 font-sans">
+                    Continuar
+                  </Button>
+                }
+              >
+                {typesError ? (
+                  <EmptyScheduleState title="Nao foi possivel carregar" description={typesError} />
+                ) : loadingTypes ? (
+                  <div className="flex min-h-80 items-center justify-center">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                  </div>
+                ) : consultationTypes.length === 0 ? (
+                  <EmptyScheduleState
+                    title="Nenhum tipo de consulta disponivel"
+                    description="Assim que novos atendimentos forem cadastrados, eles aparecerao aqui."
+                  />
+                ) : (
+                  <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
                     {consultationTypes.map((type) => (
-                      <motion.button key={type.id} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
-                        onClick={() => setSelectedType(type)}
-                        className={cn("relative p-6 rounded-xl border text-left transition-all cursor-pointer", selectedType?.id === type.id ? "border-primary bg-primary/5 ring-2 ring-primary/20" : "border-border bg-card hover:border-primary/50")}
-                      >
-                        {type.popular && (
-                          <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 bg-primary text-primary-foreground text-xs font-sans font-medium rounded-full flex items-center gap-1">
-                            <Star className="w-3 h-3" /> Mais popular
-                          </div>
-                        )}
-                        <div className="mb-4">
-                          {type.image ? (
-                            <img src={type.image} alt={type.name} className="w-full h-28 object-cover rounded-lg" />
-                          ) : (
-                            <div className="text-4xl">{type.icon}</div>
-                          )}
-                        </div>
-                        <h3 className="text-lg font-semibold text-foreground mb-1">{type.name}</h3>
-                        <p className="text-sm font-sans text-muted-foreground mb-4">{type.description}</p>
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-sans text-muted-foreground flex items-center gap-1"><Clock className="w-3 h-3" /> {type.duration}</span>
-                          <span className="text-lg font-bold text-primary">R$ {formatPrice(type.price)}</span>
-                        </div>
-                      </motion.button>
+                      <SchedulingTypeCard
+                        key={type.id}
+                        type={type}
+                        selected={selectedType?.id === type.id}
+                        onSelect={() => {
+                          setSelectedType(type)
+                          setAppliedCoupon(null)
+                          setCouponCode("")
+                        }}
+                        actionLabel="Escolher consulta"
+                      />
                     ))}
                   </div>
-                  <div className="flex justify-center">
-                    <Button onClick={() => setStep(2)} disabled={!canProceedToStep2}
-                      className="h-12 px-8 bg-primary hover:bg-primary/90 text-primary-foreground font-sans font-medium">Continuar</Button>
-                  </div>
-                </div>
-              )}
+                )}
+              </SchedulingStepLayout>
             </motion.div>
           )}
 
           {step === 2 && (
-            <motion.div key="step2" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.3 }}>
-              <div className="text-center mb-8">
-                <h1 className="text-3xl lg:text-4xl font-bold text-foreground mb-2">Escolha Data e Horário</h1>
-                <p className="text-muted-foreground font-sans">{selectedType?.name} — {selectedType?.duration}</p>
-              </div>
-              <div className="grid lg:grid-cols-2 gap-8">
-                <div className="bg-card border border-border rounded-xl p-4 lg:p-6">
-                  <div className="flex items-center gap-2 mb-4">
-                    <CalendarIcon className="w-5 h-5 text-primary" />
-                    <h2 className="text-lg font-semibold text-foreground">Selecione a data</h2>
-                  </div>
-                  <Calendar
-                    mode="single"
-                    selected={selectedDate}
-                    onSelect={(date) => { setSelectedDate(date); setSelectedTime(null) }}
-                    locale={ptBR}
-                    disabled={(date) => isWeekend(date) || isPastDate(date)}
-                    weekStartsOn={1}
-                  />
-                  <div className="mt-4 flex items-center gap-4 text-xs font-sans text-muted-foreground">
-                    <div className="flex items-center gap-1.5">
-                      <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: "var(--rdp-accent-color, oklch(0.75 0.12 45))" }} />
-                      <span>Selecionado</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <div className="w-2.5 h-2.5 rounded-full bg-secondary" />
-                      <span>Disponível</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <div className="w-2.5 h-2.5 rounded-full bg-muted-foreground/30" />
-                      <span>Indisponível</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-card border border-border rounded-xl p-4 lg:p-6">
-                  <div className="flex items-center gap-2 mb-4">
-                    <Clock className="w-5 h-5 text-primary" />
-                    <h2 className="text-lg font-semibold text-foreground">Horários disponíveis</h2>
-                  </div>
-                  {!selectedDate ? (
-                    <div className="h-64 flex items-center justify-center text-muted-foreground font-sans">Selecione uma data para ver os horários</div>
-                  ) : loadingSlots ? (
-                    <div className="h-64 flex items-center justify-center">
-                      <div className="flex flex-col items-center gap-3">
-                        <div className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
-                        <span className="text-sm font-sans text-muted-foreground">Carregando horários...</span>
-                      </div>
-                    </div>
-                  ) : (
-                    <>
-                      <p className="text-sm font-sans text-muted-foreground mb-4">
-                        {availableSlots.length} horários livres{occupiedCount > 0 && ` · ${occupiedCount} ocupados`}
-                      </p>
-                      <div className="grid grid-cols-3 gap-2">
-                        {timeSlots.map((slot) => (
-                          <button key={slot.time} onClick={() => slot.available && setSelectedTime(slot.time)}
-                            disabled={!slot.available}
-                            className={cn("py-3 px-3 rounded-lg font-sans text-sm font-medium transition-all cursor-pointer",
-                              !slot.available ? "bg-secondary/20 text-muted-foreground/40 line-through cursor-not-allowed" :
-                              selectedTime === slot.time ? "bg-gold text-background font-bold shadow-lg shadow-gold/20" :
-                              "bg-secondary/50 text-foreground hover:bg-secondary"
-                            )}
-                          >{slot.time}</button>
-                        ))}
-                      </div>
-                      {availableSlots.length === 0 && (
-                        <p className="text-center text-muted-foreground font-sans mt-8">
-                          Nenhum horário disponível nesta data.<br />Por favor, selecione outra data.
-                        </p>
-                      )}
-                    </>
-                  )}
-                </div>
-              </div>
-              <div className="mt-8 flex justify-center gap-4">
-                <Button variant="outline" onClick={() => setStep(1)} className="h-12 px-8 font-sans">Voltar</Button>
-                <Button onClick={() => setStep(3)} disabled={!canProceedToStep3}
-                  className="h-12 px-8 bg-primary hover:bg-primary/90 text-primary-foreground font-sans font-medium">Continuar</Button>
-              </div>
+            <motion.div key="step-date" initial={{ opacity: 0, x: 18 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -18 }}>
+              <SchedulingStepLayout
+                steps={steps}
+                currentStep={step}
+                title="Escolha a data"
+                description={selectedType ? `${selectedType.name} - ${selectedType.duration}` : "Escolha quando voce quer ser atendido."}
+                aside={summary}
+                footer={
+                  <>
+                    <Button variant="outline" onClick={() => setStep(1)} className="h-11 px-8 font-sans">Voltar</Button>
+                    <Button onClick={() => continueFromStep(3)} disabled={!canContinue[2]} className="h-11 px-8 font-sans">Continuar</Button>
+                  </>
+                }
+              >
+                <DatePickerSection
+                  selectedDate={selectedDate}
+                  onSelect={(date) => {
+                    setSelectedDate(date)
+                    setSelectedTime(null)
+                  }}
+                  disabled={(date) => date.getDay() === 0 || isPastDate(date)}
+                />
+              </SchedulingStepLayout>
             </motion.div>
           )}
 
           {step === 3 && (
-            <motion.div key="step3" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.3 }}>
-              <div className="text-center mb-8">
-                <h1 className="text-3xl lg:text-4xl font-bold text-foreground mb-2">Seus Dados</h1>
-                <p className="text-muted-foreground font-sans">Confirme suas informações para finalizar o agendamento</p>
-              </div>
+            <motion.div key="step-time" initial={{ opacity: 0, x: 18 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -18 }}>
+              <SchedulingStepLayout
+                steps={steps}
+                currentStep={step}
+                title="Escolha o horario"
+                description={selectedDateLabel ? `Disponibilidade para ${selectedDateLabel}.` : "Selecione uma data para consultar horarios."}
+                aside={summary}
+                footer={
+                  <>
+                    <Button variant="outline" onClick={() => setStep(2)} className="h-11 px-8 font-sans">Voltar</Button>
+                    <Button onClick={() => continueFromStep(4)} disabled={!canContinue[3]} className="h-11 px-8 font-sans">Continuar</Button>
+                  </>
+                }
+              >
+                {slotError ? (
+                  <EmptyScheduleState title="Agenda indisponivel" description={slotError} />
+                ) : (
+                  <TimeSlotSelector
+                    slots={timeSlots}
+                    selectedDate={selectedDate}
+                    selectedTime={selectedTime}
+                    loading={loadingSlots}
+                    onSelect={setSelectedTime}
+                  />
+                )}
+              </SchedulingStepLayout>
+            </motion.div>
+          )}
 
-              <div className="max-w-xl mx-auto">
-                {/* Coupon */}
-                <div className="bg-card border border-border rounded-xl p-6 mb-4">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Tag className="w-4 h-4 text-primary" />
-                    <span className="font-semibold text-foreground text-sm">Cupom de desconto</span>
-                  </div>
-                  <div className="flex gap-3">
-                    <Input placeholder="Digite seu cupom" value={couponCode}
-                      onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
-                      className="font-sans bg-input/50 uppercase" disabled={!!appliedCoupon} />
-                    <Button onClick={applyCoupon} variant="outline" disabled={!!appliedCoupon || couponLoading} className="shrink-0">
-                      {couponLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : appliedCoupon ? "Aplicado" : "Aplicar"}
-                    </Button>
-                  </div>
-                  {appliedCoupon && (
-                    <div className="flex items-center justify-between mt-2">
-                      <p className="text-sm font-sans text-green-500">
-                        Cupom {appliedCoupon.code} — {appliedCoupon.discount}% de desconto
-                      </p>
-                      <button onClick={() => { setAppliedCoupon(null); setCouponCode("") }}
-                        className="text-xs font-sans text-muted-foreground hover:text-red-500 cursor-pointer">Remover</button>
-                    </div>
-                  )}
-                </div>
-
-                {/* Summary */}
-                <div className="bg-card border border-border rounded-xl p-6 mb-4">
-                  <h3 className="font-semibold text-foreground mb-4">Resumo do Agendamento</h3>
-                  <div className="space-y-3 font-sans text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Consulta:</span>
-                      <span className="text-foreground font-medium">{selectedType?.name}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Data:</span>
-                      <span className="text-foreground font-medium">
-                        {selectedDate?.toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" })}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Horário:</span>
-                      <span className="text-foreground font-medium">{selectedTime}</span>
-                    </div>
-                    <Separator />
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Valor:</span>
-                      <span className="text-primary font-bold text-lg">
-                        {appliedCoupon ? (
-                          <span className="flex items-center gap-2">
-                            <span className="text-sm text-muted-foreground line-through">R$ {price.toFixed(2).replace(".", ",")}</span>
-                            R$ {finalPrice.toFixed(2).replace(".", ",")}
-                          </span>
-                        ) : (
-                          `R$ ${price.toFixed(2).replace(".", ",")}`
-                        )}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Form */}
-                <form onSubmit={handleSubmit} className="space-y-5">
-                  <div className="space-y-2">
-                    <Label htmlFor="name" className="font-sans">Nome completo</Label>
-                    <div className="relative">
-                      <Input id="name" type="text" required placeholder="Seu nome" value={formData.name}
-                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                        className="pl-10 h-12 bg-input/50 font-sans" />
-                      <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                    </div>
-                  </div>
-                  <div className="grid sm:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="email" className="font-sans">E-mail</Label>
+          {step === 4 && (
+            <motion.div key="step-data" initial={{ opacity: 0, x: 18 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -18 }}>
+              <SchedulingStepLayout
+                steps={steps}
+                currentStep={step}
+                title="Confirme seus dados"
+                description="Usaremos essas informacoes para confirmar a consulta e enviar o link ou orientacoes de atendimento."
+                aside={summary}
+                footer={
+                  <>
+                    <Button variant="outline" onClick={() => setStep(3)} className="h-11 px-8 font-sans">Voltar</Button>
+                    <Button onClick={() => continueFromStep(5)} disabled={!canContinue[4]} className="h-11 px-8 font-sans">Revisar</Button>
+                  </>
+                }
+              >
+                <LiquidGlassCard className="mx-auto max-w-2xl p-5 py-5 lg:p-6 lg:py-6">
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-2 sm:col-span-2">
+                      <Label htmlFor="name" className="font-sans">Nome completo</Label>
                       <div className="relative">
-                        <Input id="email" type="email" required placeholder="seu@email.com" value={formData.email}
-                          onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                          className="pl-10 h-12 bg-input/50 font-sans" />
-                        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                        <Input
+                          id="name"
+                          value={formData.name}
+                          onChange={(event) => setFormData({ ...formData, name: event.target.value })}
+                          className="h-12 bg-input/50 pl-10 font-sans"
+                          placeholder="Seu nome"
+                        />
+                        <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="email" className="font-sans">Email</Label>
+                      <div className="relative">
+                        <Input
+                          id="email"
+                          type="email"
+                          value={formData.email}
+                          onChange={(event) => setFormData({ ...formData, email: event.target.value })}
+                          className={cn("h-12 bg-input/50 pl-10 font-sans", formData.email && !isValidEmail(formData.email) && "border-red-500/50")}
+                          placeholder="seu@email.com"
+                        />
+                        <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                       </div>
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="phone" className="font-sans">WhatsApp</Label>
                       <div className="relative">
-                        <Input id="phone" type="tel" required placeholder="(00) 00000-0000" value={formData.phone}
-                          onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                          className="pl-10 h-12 bg-input/50 font-sans" />
-                        <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                        <Input
+                          id="phone"
+                          value={formData.phone}
+                          onChange={(event) => setFormData({ ...formData, phone: event.target.value })}
+                          className={cn("h-12 bg-input/50 pl-10 font-sans", formData.phone && !isValidPhone(formData.phone) && "border-red-500/50")}
+                          placeholder="(00) 00000-0000"
+                        />
+                        <Phone className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                      </div>
+                    </div>
+                    <div className="space-y-2 sm:col-span-2">
+                      <Label htmlFor="message" className="font-sans">Mensagem opcional</Label>
+                      <div className="relative">
+                        <Textarea
+                          id="message"
+                          value={formData.message}
+                          onChange={(event) => setFormData({ ...formData, message: event.target.value })}
+                          className="min-h-28 resize-none bg-input/50 pl-10 pt-3 font-sans"
+                          placeholder="Conte brevemente o que voce gostaria de abordar."
+                        />
+                        <MessageSquare className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                       </div>
                     </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="message" className="font-sans">Mensagem (opcional)</Label>
-                    <div className="relative">
-                      <Textarea id="message" placeholder="Conte um pouco sobre o que gostaria de abordar na consulta..."
-                        value={formData.message} onChange={(e) => setFormData({ ...formData, message: e.target.value })}
-                        className="pl-10 pt-3 min-h-24 bg-input/50 font-sans resize-none" />
-                      <MessageSquare className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
-                    </div>
-                  </div>
-                  <div className="flex justify-center gap-4 pt-4">
-                    <Button type="button" variant="outline" onClick={() => setStep(2)} className="h-12 px-8 font-sans">Voltar</Button>
-                    <Button type="submit" disabled={submitting}
-                      className="h-12 px-8 bg-primary hover:bg-primary/90 text-primary-foreground font-sans font-medium gap-2">
-                      {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
-                      {submitting ? "Agendando..." : `Confirmar${discount > 0 ? ` — R$ ${finalPrice.toFixed(2).replace(".", ",")}` : ""}`}
-                    </Button>
-                  </div>
-                </form>
-              </div>
+                </LiquidGlassCard>
+              </SchedulingStepLayout>
             </motion.div>
           )}
 
-          {step === 4 && (
-            <motion.div key="step4" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.4 }}
-              className="text-center py-12">
-              <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
-                className="w-24 h-24 mx-auto mb-8 bg-primary/10 rounded-full flex items-center justify-center">
-                <CheckCircle2 className="w-12 h-12 text-primary" />
-              </motion.div>
-              <h1 className="text-3xl lg:text-4xl font-bold text-foreground mb-4">Agendamento Confirmado!</h1>
-              <p className="text-muted-foreground font-sans max-w-md mx-auto mb-8">
-                Enviamos um e-mail com todos os detalhes da sua consulta para{" "}
-                <span className="text-foreground">{formData.email}</span>
-              </p>
-              <div className="bg-card border border-border rounded-xl p-6 max-w-md mx-auto mb-8">
-                <div className="space-y-3 font-sans text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Consulta:</span>
-                    <span className="text-foreground font-medium">{selectedType?.name}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Data:</span>
-                    <span className="text-foreground font-medium">
-                      {selectedDate?.toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" })}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Horário:</span>
-                    <span className="text-foreground font-medium">{selectedTime}</span>
-                  </div>
-                  {appliedCoupon && (
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Valor pago:</span>
-                      <span className="text-green-500 font-bold">R$ {finalPrice.toFixed(2).replace(".", ",")}</span>
+          {step === 5 && (
+            <motion.div key="step-review" initial={{ opacity: 0, x: 18 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -18 }}>
+              <SchedulingStepLayout
+                steps={steps}
+                currentStep={step}
+                title="Revise e confirme"
+                description="Confira os detalhes. Se algo estiver errado, volte para ajustar antes de enviar."
+                aside={summary}
+                footer={
+                  <>
+                    <Button variant="outline" onClick={() => setStep(4)} className="h-11 px-8 font-sans">Voltar</Button>
+                    <Button onClick={handleSubmit} disabled={!canContinue[5]} className="h-11 px-8 gap-2 font-sans">
+                      {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                      {submitting ? "Enviando..." : "Confirmar agendamento"}
+                    </Button>
+                  </>
+                }
+              >
+                <div className="mx-auto grid max-w-3xl gap-4">
+                  <LiquidGlassCard className="p-5 py-5">
+                    <h2 className="text-base font-semibold text-foreground">Dados de contato</h2>
+                    <div className="mt-4 grid gap-3 text-sm font-sans sm:grid-cols-3">
+                      <div>
+                        <span className="text-muted-foreground">Nome</span>
+                        <p className="font-medium text-foreground">{formData.name}</p>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Email</span>
+                        <p className="truncate font-medium text-foreground">{formData.email}</p>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">WhatsApp</span>
+                        <p className="font-medium text-foreground">{formData.phone}</p>
+                      </div>
                     </div>
-                  )}
+                  </LiquidGlassCard>
+
+                  <LiquidGlassCard className="p-5 py-5">
+                    <div className="mb-3 flex items-center gap-2">
+                      <Tag className="h-4 w-4 text-primary" />
+                      <h2 className="text-base font-semibold text-foreground">Cupom de desconto</h2>
+                    </div>
+                    <div className="flex flex-col gap-3 sm:flex-row">
+                      <Input
+                        placeholder="Digite seu cupom"
+                        value={couponCode}
+                        onChange={(event) => setCouponCode(event.target.value.toUpperCase())}
+                        disabled={!!appliedCoupon}
+                        className="bg-input/50 uppercase font-sans"
+                      />
+                      <Button variant="outline" onClick={applyCoupon} disabled={couponLoading || !!appliedCoupon} className="gap-2 font-sans">
+                        {couponLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                        {appliedCoupon ? "Aplicado" : "Aplicar"}
+                      </Button>
+                    </div>
+                    {appliedCoupon ? (
+                      <div className="mt-3 flex items-center justify-between rounded-lg bg-green-500/10 px-3 py-2 text-sm text-green-500 font-sans">
+                        <span>{appliedCoupon.code} aplicado</span>
+                        <button type="button" onClick={() => { setAppliedCoupon(null); setCouponCode("") }} className="hover:underline">
+                          Remover
+                        </button>
+                      </div>
+                    ) : null}
+                  </LiquidGlassCard>
                 </div>
-              </div>
-              <Button asChild className="h-12 px-8 bg-primary hover:bg-primary/90">
-                <Link href="/">Voltar para o Início</Link>
-              </Button>
+              </SchedulingStepLayout>
+            </motion.div>
+          )}
+
+          {step === 6 && (
+            <motion.div key="step-success" initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }}>
+              <SchedulingStepLayout steps={steps} currentStep={step} title="" description="">
+                <BookingConfirmation
+                  type={selectedType}
+                  selectedDate={selectedDate}
+                  selectedTime={selectedTime}
+                  email={formData.email}
+                  finalPrice={finalPrice}
+                />
+              </SchedulingStepLayout>
             </motion.div>
           )}
         </AnimatePresence>
       </main>
     </div>
+  )
+}
+
+export default function AgendamentoPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-background" />}>
+      <AgendamentoContent />
+    </Suspense>
   )
 }

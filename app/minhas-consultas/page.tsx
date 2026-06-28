@@ -7,25 +7,20 @@ import { motion } from "framer-motion"
 import { ArrowLeft, Calendar, Clock, XCircle, Loader2 } from "lucide-react"
 import { MoonIcon } from "@/components/moon-icon"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Card, CardContent } from "@/components/ui/card"
+import { CardContent } from "@/components/ui/card"
+import { ExpandableText } from "@/components/ui/expandable-text"
+import { LiquidGlassCard } from "@/components/ui/liquid-glass-card"
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
+import { EmptyScheduleState, ScheduleStatusBadge } from "@/components/scheduling"
 import { useAuth } from "@/lib/contexts/auth-context"
 import { getAppointmentsByClient, updateAppointmentStatus } from "@/lib/services"
-import { cn } from "@/lib/utils"
+import { formatPrice } from "@/lib/utils"
 import { toast } from "sonner"
 import type { Appointment } from "@/lib/types"
-
-const statusConfig: Record<string, { label: string; class: string }> = {
-  pending: { label: "Pendente", class: "bg-yellow-500/10 text-yellow-500 border-yellow-500/30" },
-  confirmed: { label: "Confirmado", class: "bg-green-500/10 text-green-500 border-green-500/30" },
-  cancelled: { label: "Cancelado", class: "bg-red-500/10 text-red-500 border-red-500/30" },
-  completed: { label: "Realizado", class: "bg-blue-500/10 text-blue-500 border-blue-500/30" },
-}
 
 export default function MinhasConsultas() {
   const { user, loading } = useAuth()
@@ -92,29 +87,24 @@ export default function MinhasConsultas() {
           <h1 className="text-3xl lg:text-4xl font-bold text-foreground mb-8">Minhas Consultas</h1>
 
           {appointments.length === 0 ? (
-            <div className="text-center py-16">
-              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-secondary/50 flex items-center justify-center">
-                <Calendar className="w-7 h-7 text-muted-foreground" />
-              </div>
-              <p className="text-foreground font-medium mb-1">Nenhuma consulta agendada</p>
-              <p className="text-sm font-sans text-muted-foreground mb-6">Agende sua primeira consulta e descubra um novo caminho</p>
-              <Button asChild className="bg-primary hover:bg-primary/90">
-                <Link href="/agendamento">Agendar Consulta</Link>
-              </Button>
-            </div>
+            <EmptyScheduleState
+              title="Nenhuma consulta agendada"
+              description="Agende sua primeira consulta e acompanhe status, data e horario por aqui."
+              actionHref="/consultas"
+              actionLabel="Agendar consulta"
+            />
           ) : (
             <div className="space-y-4">
               {appointments.map((apt, i) => {
-                const cfg = statusConfig[apt.status] || statusConfig.pending
                 return (
                   <motion.div key={apt.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}>
-                    <Card className="bg-card border-border hover:border-primary/30 transition-all">
+                    <LiquidGlassCard className="min-h-[166px] py-0">
                       <CardContent className="p-6">
                         <div className="flex items-start justify-between gap-4">
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-3 mb-2 flex-wrap">
                               <h3 className="text-lg font-semibold text-foreground">{apt.typeName}</h3>
-                              <Badge variant="outline" className={cn("text-xs font-sans", cfg.class)}>{cfg.label}</Badge>
+                              <ScheduleStatusBadge status={apt.status} />
                             </div>
                             <div className="flex flex-wrap gap-4 text-sm font-sans text-muted-foreground">
                               <span className="flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5" />
@@ -123,12 +113,19 @@ export default function MinhasConsultas() {
                               <span className="flex items-center gap-1.5"><Clock className="w-3.5 h-3.5" />{apt.time}</span>
                             </div>
                             <p className="text-xs font-sans text-muted-foreground mt-1">Agendado em {apt.createdAt.toLocaleDateString("pt-BR")}</p>
-                            {apt.notes && apt.status === "cancelled" && (
-                              <p className="text-xs font-sans text-red-400/70 mt-1 italic">&ldquo;{apt.notes}&rdquo;</p>
+                            {(apt.message || apt.notes) && (
+                              <div className="mt-3 rounded-md border border-white/10 bg-secondary/40 px-3 py-2">
+                                <ExpandableText
+                                  text={apt.notes || apt.message}
+                                  lines={2}
+                                  threshold={120}
+                                  className="text-xs leading-relaxed text-muted-foreground font-sans"
+                                />
+                              </div>
                             )}
                           </div>
                           <div className="text-right shrink-0 flex flex-col items-end gap-2">
-                            <p className="text-lg font-bold text-primary">R$ {apt.price.toFixed(2).replace(".", ",")}</p>
+                            <p className="text-lg font-bold text-primary">R$ {formatPrice(apt.price)}</p>
                             {canCancel(apt) && (
                               <Button variant="outline" size="sm"
                                 className="h-7 text-xs gap-1 text-red-400 border-red-500/30 hover:bg-red-500/10 font-sans"
@@ -139,7 +136,7 @@ export default function MinhasConsultas() {
                           </div>
                         </div>
                       </CardContent>
-                    </Card>
+                    </LiquidGlassCard>
                   </motion.div>
                 )
               })}

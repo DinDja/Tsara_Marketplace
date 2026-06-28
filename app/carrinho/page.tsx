@@ -28,7 +28,15 @@ import { lookupCep, calculateShipping } from "@/lib/services/shipping"
 import { getCouponByCode } from "@/lib/services"
 import { toast } from "sonner"
 import type { CepResult, FreightOption } from "@/lib/services/shipping"
-import type { Coupon, UserAddress } from "@/lib/types"
+import type { Coupon, Product, UserAddress } from "@/lib/types"
+
+function isPurchasable(product: Product) {
+  return product.status !== "inactive"
+    && !product.priceOnRequest
+    && product.price > 0
+    && product.stockManaged !== false
+    && product.stock > 0
+}
 
 export default function CarrinhoPage() {
   const { user } = useAuth()
@@ -133,13 +141,13 @@ export default function CarrinhoPage() {
         })
       )
       const outOfStock = stockChecks.filter(({ item, product }) =>
-        !product || product.stock <= 0 || product.status === "inactive"
+        !product || !isPurchasable(product)
       )
       const exceedsStock = stockChecks.filter(({ item, product }) =>
         product && item.quantity > product.stock
       )
       if (outOfStock.length > 0) {
-        toast.error(`${outOfStock.map(({ item }) => item.name).join(", ")} ${outOfStock.length === 1 ? "está" : "estão"} fora de estoque`)
+        toast.error(`${outOfStock.map(({ item }) => item.name).join(", ")} ${outOfStock.length === 1 ? "está indisponível" : "estão indisponíveis"} para compra`)
         setSubmitting(false); return
       }
       if (exceedsStock.length > 0) {

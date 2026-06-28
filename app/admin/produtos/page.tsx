@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
   Search, Plus, MoreVertical, Edit, Trash2, Eye, Package,
   TrendingUp, AlertTriangle, Image as ImageIcon,
+  ChevronLeft, ChevronRight,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -20,9 +21,9 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { SkeletonTable, SkeletonStatsGrid } from "@/components/ui/data-skeleton";
-import { useProducts } from "@/lib/hooks";
+import { useProductsPaginated } from "@/lib/hooks";
 import { useAsyncMutation } from "@/lib/hooks/useAsync";
-import { createProduct, updateProduct, deleteProduct } from "@/lib/services";
+import { createProduct, updateProduct, deleteProduct, getProductsPaginated } from "@/lib/services";
 import { fileToBase64 } from "@/lib/image";
 import { cn, formatPrice } from "@/lib/utils";
 import { toast } from "sonner";
@@ -39,9 +40,15 @@ const emptyForm = {
 export default function AdminProdutos() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("Todos");
-  const { data: products, loading, refetch } = useProducts();
+  const { data: products, loading, total, page, goToPage, refetch } = useProductsPaginated(
+    selectedCategory !== "Todos" ? { category: selectedCategory } : undefined
+  );
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Product | null>(null);
+  const pageSize = selectedCategory !== "Todos" ? 30 : 12
+  const totalPages = Math.ceil(total / pageSize);
+
+  useEffect(() => { goToPage(1) }, [selectedCategory])
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   const [priceStr, setPriceStr] = useState("");
@@ -97,23 +104,30 @@ export default function AdminProdutos() {
     catch { toast.error("Erro ao excluir"); }
   };
 
-  const filteredProducts = (products || []).filter((product) => {
-    const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory = selectedCategory === "Todos" || product.category === selectedCategory;
-    return matchesSearch && matchesCategory;
-  });
+  let displayProducts = products || [];
+  if (searchQuery) {
+    displayProducts = displayProducts.filter((product) =>
+      product.name.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }
 
-  const totalProducts = products?.length || 0;
-  const activeProducts = products?.filter((p) => p.status === "active").length || 0;
-  const lowStockProducts = products?.filter((p) => p.status === "low_stock").length || 0;
-  const outOfStock = products?.filter((p) => p.stock === 0).length || 0;
+  const totalProducts = total;
+  const activeProducts = displayProducts.filter((p) => p.status === "active").length;
+  const lowStockProducts = displayProducts.filter((p) => p.status === "low_stock").length;
+  const outOfStock = displayProducts.filter((p) => p.stock === 0).length;
 
-  const getStatusBadge = (status: string, stock: number) => {
-    if (stock === 0) return <Badge variant="outline" className="bg-red-500/10 text-red-500 border-red-500/20 text-xs font-sans">Sem estoque</Badge>;
+  const getStatusBadge = (product: Product) => {
+    if (product.status === "inactive") {
+      return <Badge variant="outline" className="bg-secondary text-muted-foreground text-xs font-sans">Inativo</Badge>;
+    }
+    if (product.priceOnRequest || product.stockManaged === false || product.price <= 0) {
+      return <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20 text-xs font-sans">Sob consulta</Badge>;
+    }
+    if (product.stock === 0) return <Badge variant="outline" className="bg-red-500/10 text-red-500 border-red-500/20 text-xs font-sans">Sem estoque</Badge>;
+    const { status } = product;
     switch (status) {
       case "active": return <Badge variant="outline" className="bg-green-500/10 text-green-500 border-green-500/20 text-xs font-sans">Ativo</Badge>;
       case "low_stock": return <Badge variant="outline" className="bg-yellow-500/10 text-yellow-500 border-yellow-500/20 text-xs font-sans">Estoque baixo</Badge>;
-      case "inactive": return <Badge variant="outline" className="bg-secondary text-muted-foreground text-xs font-sans">Inativo</Badge>;
       default: return null;
     }
   };
@@ -284,7 +298,7 @@ export default function AdminProdutos() {
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredProducts.map((product) => (
+                    {displayProducts.map((product) => (
                       <tr key={product.id} className="border-b border-border last:border-0 hover:bg-secondary/20 transition-colors">
                         <td className="py-4 px-6">
                           <div className="flex items-center gap-3">
@@ -300,12 +314,18 @@ export default function AdminProdutos() {
                           </div>
                         </td>
                         <td className="py-4 px-6"><span className="text-sm font-sans text-muted-foreground">{product.category}</span></td>
-                        <td className="py-4 px-6 text-right"><span className="text-sm font-sans font-medium text-foreground">R$ {formatPrice(product.price)}</span></td>
                         <td className="py-4 px-6 text-right">
-                          <span className={cn("text-sm font-sans font-medium", product.stock === 0 ? "text-red-500" : product.stock < 10 ? "text-yellow-500" : "text-foreground")}>{product.stock} un.</span>
+                          <span className="text-sm font-sans font-medium text-foreground">
+                            {product.priceOnRequest || product.price <= 0 ? "Sob consulta" : `R$ ${formatPrice(product.price)}`}
+                          </span>
+                        </td>
+                        <td className="py-4 px-6 text-right">
+                          <span className={cn("text-sm font-sans font-medium", product.stockManaged === false ? "text-primary" : product.stock === 0 ? "text-red-500" : product.stock < 10 ? "text-yellow-500" : "text-foreground")}>
+                            {product.stockManaged === false ? "Sob consulta" : `${product.stock} un.`}
+                          </span>
                         </td>
                         <td className="py-4 px-6 text-right"><span className="text-sm font-sans text-muted-foreground">{product.sold} un.</span></td>
-                        <td className="py-4 px-6 text-center">{getStatusBadge(product.status, product.stock)}</td>
+                        <td className="py-4 px-6 text-center">{getStatusBadge(product)}</td>
                         <td className="py-4 px-6 text-right">
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
@@ -328,6 +348,39 @@ export default function AdminProdutos() {
           </CardContent>
         </Card>
       </motion.div>
+
+      {totalPages > 1 && (
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6 }}>
+          <div className="flex items-center justify-between px-2">
+            <p className="text-sm font-sans text-muted-foreground">
+              Página {page} de {totalPages} ({total} produtos)
+            </p>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => goToPage(page - 1)} className="gap-1">
+                <ChevronLeft className="w-4 h-4" /> Anterior
+              </Button>
+              {Array.from({ length: totalPages }, (_, i) => i + 1)
+                .filter((p) => p === 1 || p === totalPages || Math.abs(p - page) <= 2)
+                .map((p, idx, arr) => (
+                  <span key={p} className="flex items-center gap-1">
+                    {idx > 0 && arr[idx - 1] !== p - 1 && <span className="text-muted-foreground px-1">...</span>}
+                    <Button
+                      variant={p === page ? "default" : "outline"}
+                      size="icon-sm"
+                      onClick={() => goToPage(p)}
+                      className="w-8 h-8 text-xs"
+                    >
+                      {p}
+                    </Button>
+                  </span>
+                ))}
+              <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => goToPage(page + 1)} className="gap-1">
+                Próximo <ChevronRight className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+        </motion.div>
+      )}
     </div>
   );
 }

@@ -1,6 +1,6 @@
-import { Timestamp } from "firebase/firestore"
 import { createProduct } from "./products"
 import { createConsultationType } from "./consultations"
+import { getConsultationFallbackImage } from "@/lib/fallback-images"
 
 export async function seedProducts() {
   const products = [
@@ -19,11 +19,12 @@ export async function seedProducts() {
 }
 
 export async function seedConsultations() {
-  const types = [
-    { name: "Tarot Terapêutico", duration: "60 min", price: 180, originalPrice: undefined as number | undefined, description: "Uma jornada profunda pelo simbolismo do Tarot.", features: ["Leitura completa de 10 cartas", "Análise de ciclos e padrões", "Orientações práticas", "Gravação da sessão"], popular: true, icon: "🃏", image: "" },
-    { name: "Baralho Cigano", duration: "45 min", price: 150, originalPrice: undefined, description: "A sabedoria ancestral cigana aplicada às suas questões.", features: ["Tiragem da Mesa Real", "Foco em questões específicas", "Previsões temporais", "Resumo por escrito"], popular: false, icon: "🔮", image: "" },
-    { name: "Sessão Completa", duration: "90 min", price: 280, originalPrice: 330, description: "Combine Tarot e Baralho Cigano para uma visão 360°.", features: ["Tarot + Baralho Cigano", "Análise de todas as áreas", "Mapa energético pessoal", "Acompanhamento por 7 dias"], popular: false, icon: "✨", image: "" },
+  const bases = [
+    { name: "Tarot Terapêutico", duration: "60 min", price: 180, originalPrice: undefined as number | undefined, description: "Uma jornada profunda pelo simbolismo do Tarot.", features: ["Leitura completa de 10 cartas", "Análise de ciclos e padrões", "Orientações práticas", "Gravação da sessão"], popular: true, icon: "🃏" },
+    { name: "Baralho Cigano", duration: "45 min", price: 150, originalPrice: undefined, description: "A sabedoria ancestral cigana aplicada às suas questões.", features: ["Tiragem da Mesa Real", "Foco em questões específicas", "Previsões temporais", "Resumo por escrito"], popular: false, icon: "🔮" },
+    { name: "Sessão Completa", duration: "90 min", price: 280, originalPrice: 330, description: "Combine Tarot e Baralho Cigano para uma visão 360°.", features: ["Tarot + Baralho Cigano", "Análise de todas as áreas", "Mapa energético pessoal", "Acompanhamento por 7 dias"], popular: false, icon: "✨" },
   ]
+  const types = bases.map((t) => ({ ...t, image: getConsultationFallbackImage() }))
   for (const t of types) {
     try { await createConsultationType(t as any) } catch { /* skip */ }
   }

@@ -8,6 +8,9 @@ __v0_jsx-dev-runtime.ts
 
 # Environment variables
 .env*.local
+*firebase-adminsdk*.json
+*service-account*.json
+public/*firebase-adminsdk*.json
 
 # Common ignores
 node_modules

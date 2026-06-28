@@ -1,25 +1,24 @@
 "use client"
 
 import { useState } from "react"
-import Image from "next/image"
 import Link from "next/link"
 import { motion } from "framer-motion"
-import { ShoppingCart, Star, ArrowRight } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Card } from "@/components/ui/card"
-import { SkeletonProductGrid } from "@/components/ui/data-skeleton"
-import { useProductsByCategory } from "@/lib/hooks"
-import { useCart } from "@/lib/contexts/cart-context"
-import { toast } from "sonner"
-import { cn, formatPrice } from "@/lib/utils"
+import { ArrowRight } from "lucide-react"
 
-const categories = [
-  { id: "all", label: "Todos" },
-  { id: "Cristais", label: "Cristais" },
-  { id: "Velas", label: "Velas Ritualísticas" },
-  { id: "Incensos", label: "Incensos" },
-  { id: "Oráculos", label: "Oráculos" },
-]
+import { ProductCard } from "@/components/product-card"
+import { Button } from "@/components/ui/button"
+import { SkeletonProductGrid } from "@/components/ui/data-skeleton"
+import { useCart } from "@/lib/contexts/cart-context"
+import { PRODUCT_CATEGORIES } from "@/lib/constants"
+import { useProductsByCategory } from "@/lib/hooks"
+import { cn } from "@/lib/utils"
+import { toast } from "sonner"
+
+const categories = PRODUCT_CATEGORIES
+
+function isConsultOnly(product: NonNullable<ReturnType<typeof useProductsByCategory>["data"]>[number]) {
+  return product.priceOnRequest || product.stockManaged === false || product.price <= 0
+}
 
 export function Products() {
   const [activeCategory, setActiveCategory] = useState("all")
@@ -27,13 +26,17 @@ export function Products() {
   const { addItem } = useCart()
 
   const handleAddToCart = (product: NonNullable<typeof products>[number]) => {
+    if (isConsultOnly(product)) {
+      toast.info(`${product.name} esta disponivel sob consulta`)
+      return
+    }
     if (product.stock <= 0 || product.status === "inactive") {
-      toast.error(`${product.name} está fora de estoque`)
+      toast.error(`${product.name} esta fora de estoque`)
       return
     }
     const added = addItem(product)
     if (!added) {
-      toast.error("Quantidade máxima em estoque atingida")
+      toast.error("Quantidade maxima em estoque atingida")
       return
     }
     toast.success(`${product.name} adicionado ao carrinho!`, {
@@ -43,25 +46,24 @@ export function Products() {
   }
 
   return (
-    <section id="produtos" className="py-24 md:py-32 relative">
+    <section id="produtos" className="relative py-24 md:py-32">
       <div className="absolute inset-0 bg-gradient-to-b from-background via-card/50 to-background" />
-      
-      <div className="relative max-w-7xl mx-auto px-6">
+
+      <div className="relative mx-auto max-w-7xl px-6">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          className="text-center mb-16"
+          className="mb-16 text-center"
         >
-          <span className="text-sm tracking-[0.3em] uppercase text-gold font-sans">
-            Nossa Coleção
+          <span className="text-sm uppercase tracking-[0.3em] text-gold font-sans">
+            Nossa Colecao
           </span>
-          <h2 className="mt-4 text-4xl md:text-5xl lg:text-6xl font-light text-foreground">
+          <h2 className="mt-4 text-4xl font-light text-foreground md:text-5xl lg:text-6xl">
             Artigos <span className="italic text-gold">Sagrados</span>
           </h2>
-          <p className="mt-6 max-w-2xl mx-auto text-muted-foreground font-sans leading-relaxed">
-            Cada item foi cuidadosamente selecionado e energizado para auxiliar 
-            em sua jornada de autoconhecimento e proteção espiritual.
+          <p className="mx-auto mt-6 max-w-2xl leading-relaxed text-muted-foreground font-sans">
+            Cada item foi cuidadosamente selecionado e energizado para auxiliar em sua jornada de autoconhecimento e protecao espiritual.
           </p>
         </motion.div>
 
@@ -69,17 +71,18 @@ export function Products() {
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          className="flex flex-wrap justify-center gap-3 mb-12"
+          className="mb-12 flex flex-wrap justify-center gap-3"
         >
           {categories.map((cat) => (
             <button
               key={cat.id}
+              type="button"
               onClick={() => setActiveCategory(cat.id)}
               className={cn(
-                "px-5 py-2 rounded-full text-sm tracking-wider font-sans transition-all duration-300",
+                "rounded-full px-5 py-2 text-sm tracking-wider transition-all duration-300 font-sans",
                 activeCategory === cat.id
                   ? "bg-gold text-background"
-                  : "bg-secondary/50 text-muted-foreground hover:bg-gold/20 hover:text-gold"
+                  : "bg-secondary/50 text-muted-foreground hover:bg-gold/20 hover:text-gold",
               )}
             >
               {cat.label}
@@ -93,92 +96,31 @@ export function Products() {
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="text-center py-16"
+            className="py-16 text-center"
           >
-            <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-secondary/50 flex items-center justify-center text-3xl opacity-50">
-              ✦
+            <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-secondary/50 text-3xl opacity-50">
+              *
             </div>
-            <p className="text-muted-foreground font-sans">
-              Nenhum produto encontrado nesta categoria.
-            </p>
+            <p className="text-muted-foreground font-sans">Nenhum produto encontrado nesta categoria.</p>
           </motion.div>
         ) : (
           <motion.div
             initial="hidden"
             whileInView="visible"
             viewport={{ once: true }}
-            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8"
+            className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 md:gap-8"
           >
             {products.slice(0, 3).map((product, index) => (
-                <motion.div
-                  key={product.id}
-                  initial={{ opacity: 0, y: 30 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ delay: index * 0.08 }}
-                >
-                  <Link href={`/produto/${product.id}`} className="block">
-                  <Card className="group bg-card/50 border-border/50 overflow-hidden hover:border-gold/30 transition-all duration-500">
-                    <div className="relative aspect-square bg-secondary/30 overflow-hidden">
-                      <Image
-                        src={product.image}
-                        alt={product.name}
-                        fill
-                        className="object-cover transition-transform duration-500 group-hover:scale-110"
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-background/60 via-transparent to-transparent" />
-                      {product.badge && (
-                        <div className="absolute top-4 left-4 px-3 py-1 bg-gold text-background text-xs tracking-wider font-sans rounded-full">
-                          {product.badge}
-                        </div>
-                      )}
-                      <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-background/40 backdrop-blur-sm">
-                        {product.stock <= 0 || product.status === "inactive" ? (
-                          <span className="px-4 py-2 rounded-lg bg-destructive/10 text-destructive text-sm font-sans font-medium">
-                            Esgotado
-                          </span>
-                        ) : (
-                          <Button
-                            className="bg-gold text-background hover:bg-gold/90 font-sans"
-                            onClick={(e) => { e.preventDefault(); handleAddToCart(product) }}
-                          >
-                            <ShoppingCart className="w-4 h-4 mr-2" />
-                            Adicionar
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="p-5">
-                      <div className="flex items-center gap-1 mb-2">
-                        <Star className="w-4 h-4 fill-gold text-gold" />
-                        <span className="text-sm text-gold font-sans">{product.rating}</span>
-                        <span className="text-sm text-muted-foreground font-sans">
-                          ({product.reviews})
-                        </span>
-                      </div>
-                      <h3 className="text-lg font-light text-foreground mb-2 group-hover:text-gold transition-colors">
-                        {product.name}
-                      </h3>
-                      {product.description && (
-                        <p className="text-sm text-muted-foreground font-sans line-clamp-2 mb-3">
-                          {product.description}
-                        </p>
-                      )}
-                      <div className="flex items-baseline gap-2">
-                        <span className="text-xl text-gold font-sans font-medium">
-                          R$ {formatPrice(product.price)}
-                        </span>
-                        {product.originalPrice ? (
-                          <span className="text-sm text-muted-foreground line-through font-sans">
-                            R$ {formatPrice(product.originalPrice)}
-                          </span>
-                        ) : null}
-                      </div>
-                    </div>
-                  </Card>
-                  </Link>
-                </motion.div>
+              <motion.div
+                key={product.id}
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: index * 0.08 }}
+                className="h-full"
+              >
+                <ProductCard product={product} onAddToCart={handleAddToCart} />
+              </motion.div>
             ))}
           </motion.div>
         )}
@@ -187,18 +129,19 @@ export function Products() {
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          className="text-center mt-12"
+          className="mt-12 text-center"
         >
-          <Link href="/produtos">
-            <Button
-              variant="outline"
-              size="lg"
-              className="border-gold/30 text-gold hover:bg-gold/10 tracking-wider font-sans group"
-            >
+          <Button
+            asChild
+            variant="outline"
+            size="lg"
+            className="border-gold/30 text-gold hover:bg-gold/10 tracking-wider font-sans group"
+          >
+            <Link href="/produtos">
               Ver Todos os Produtos
-              <ArrowRight className="w-4 h-4 ml-2 transition-transform group-hover:translate-x-1" />
-            </Button>
-          </Link>
+              <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
+            </Link>
+          </Button>
         </motion.div>
       </div>
     </section>

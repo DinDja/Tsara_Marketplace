@@ -192,6 +192,50 @@ Arquivo: `lib/firebase/config.ts`
 
 Regras de seguranca: `firestore.rules`
 
+### Importacao de produtos da Luar
+
+O projeto inclui um importador real para `https://www.luar.com.br`, usando os endpoints publicos que o proprio catalogo da Luar usa.
+
+Primeiro rode em dry-run para conferir volumes, categorias e amostras:
+
+```bash
+npm run import:luar
+```
+
+Para gravar no Firestore, use uma chave da Firebase Admin SDK. O importador procura por padrao em:
+
+```bash
+public/tsara-ab3fc-firebase-adminsdk-fbsvc-82add8080a.json
+```
+
+Depois execute:
+
+```bash
+npm run import:luar -- --write
+```
+
+Voce tambem pode informar outro caminho:
+
+```bash
+npm run import:luar -- --write --service-account=./firebase-adminsdk.json
+```
+
+ou via variavel:
+
+```bash
+TSARA_FIREBASE_SERVICE_ACCOUNT=./firebase-adminsdk.json
+```
+
+Opcoes uteis:
+
+```bash
+npm run import:luar -- --category=4,10 --limit=20
+npm run import:luar -- --write --active-only
+npm run import:luar -- --write --overwrite-commerce
+```
+
+Observacao: a Luar publica nome, descricao, status, destaque e imagens, mas nao publica preco nem estoque numerico. Por isso, produtos importados entram como `priceOnRequest: true` e `stockManaged: false`, aparecendo no catalogo como "Sob consulta" ate que preco e estoque sejam preenchidos no TSARA.
+
 ### InfinitePay
 
 Arquivo: `lib/infinitePay/config.ts`

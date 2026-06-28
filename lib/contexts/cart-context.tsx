@@ -18,6 +18,14 @@ const CartContext = createContext<CartContextType | null>(null)
 
 const STORAGE_KEY = "tsara-cart"
 
+function isPurchasable(product: Product) {
+  return product.status !== "inactive"
+    && !product.priceOnRequest
+    && product.price > 0
+    && product.stockManaged !== false
+    && product.stock > 0
+}
+
 function loadCart(): CartItem[] {
   if (typeof window === "undefined") return []
   try {
@@ -49,8 +57,15 @@ export function CartProvider({ children }: { children: ReactNode }) {
         items.map(async (item) => {
           try {
             const product = await getProductById(item.productId)
-            if (!product || product.stock <= 0 || product.status === "inactive") return null
-            return { ...item, stock: product.stock, status: product.status, price: product.price }
+            if (!product || !isPurchasable(product)) return null
+            return {
+              ...item,
+              stock: product.stock,
+              status: product.status,
+              price: product.price,
+              priceOnRequest: product.priceOnRequest,
+              stockManaged: product.stockManaged,
+            }
           } catch {
             return item
           }
@@ -66,7 +81,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   }, [items, hydrated])
 
   const addItem = useCallback((product: Product, quantity = 1) => {
-    if (product.stock <= 0 || product.status === "inactive") {
+    if (!isPurchasable(product)) {
       return false
     }
     setItems((prev) => {
@@ -93,6 +108,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
           freeShipping: product.freeShipping,
           status: product.status,
           stock: product.stock,
+          priceOnRequest: product.priceOnRequest,
+          stockManaged: product.stockManaged,
         },
       ]
     })

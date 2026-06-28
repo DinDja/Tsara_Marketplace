@@ -1,6 +1,6 @@
 export { useAsyncData, useAsyncMutation } from "./useAsync"
-export { useProducts, useProduct, useFeaturedProducts, useProductsByCategory } from "./useProducts"
-export { useAppointments, useOccupiedSlots } from "./useAppointments"
+export { useProducts, useProduct, useFeaturedProducts, useProductsByCategory, useProductsPaginated } from "./useProducts"
+export { useAppointments, useOccupiedSlots, useAppointmentsPaginated } from "./useAppointments"
 export { useClients } from "./useClients"
 export { useDashboardStats, useTopProducts, useRecentAppointments, useRecentOrders } from "./useDashboard"
 export { useOrders } from "./useOrders"

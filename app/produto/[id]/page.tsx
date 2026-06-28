@@ -5,14 +5,15 @@ import Link from "next/link"
 import { useParams } from "next/navigation"
 import { motion } from "framer-motion"
 import {
-  ArrowLeft, ShoppingCart, Star, Clock, Package,
-  Truck, Shield, ChevronDown, ChevronUp,
+  ArrowLeft, ShoppingCart, Star,
+  Truck, Shield,
 } from "lucide-react"
 import { MoonIcon } from "@/components/moon-icon"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
+import { ExpandableText } from "@/components/ui/expandable-text"
+import { LiquidGlassCard } from "@/components/ui/liquid-glass-card"
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
-import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
 import { SkeletonProductGrid } from "@/components/ui/data-skeleton"
 import { useProduct } from "@/lib/hooks"
@@ -37,7 +38,6 @@ export default function ProdutoDetalhe() {
   const [userRating, setUserRating] = useState(0)
   const [userComment, setUserComment] = useState("")
   const [submittingReview, setSubmittingReview] = useState(false)
-  const [descExpanded, setDescExpanded] = useState(false)
 
   const loadReviews = async () => {
     if (!reviewsLoaded && id) {
@@ -68,8 +68,8 @@ export default function ProdutoDetalhe() {
     )
   }
 
-  const hasLongDesc = (product.description?.length ?? 0) > 300
-  const displayDesc = descExpanded || !hasLongDesc ? product.description : product.description?.slice(0, 300) + "..."
+  const consultOnly = product.priceOnRequest || product.stockManaged === false || product.price <= 0
+  const unavailable = consultOnly || product.stock <= 0 || product.status === "inactive"
 
   const handleSubmitReview = async () => {
     if (!user) { toast.error("Faça login para avaliar"); return }
@@ -144,14 +144,18 @@ export default function ProdutoDetalhe() {
             </div>
 
             <div className="flex items-baseline gap-3">
-              <span className="text-4xl font-bold text-primary">R$ {formatPrice(product.price)}</span>
-              {product.originalPrice ? (
+              <span className="text-4xl font-bold text-primary">
+                {consultOnly ? "Sob consulta" : `R$ ${formatPrice(product.price)}`}
+              </span>
+              {!consultOnly && product.originalPrice ? (
                 <span className="text-lg text-muted-foreground line-through font-sans">R$ {formatPrice(product.originalPrice)}</span>
               ) : null}
             </div>
 
             <div className="flex items-center gap-4 text-sm font-sans text-muted-foreground flex-wrap">
-              {product.stock === 0 ? (
+              {consultOnly ? (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 text-primary font-medium text-xs">Consulte disponibilidade</span>
+              ) : product.stock === 0 ? (
                 <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-500/10 text-red-500 font-medium text-xs">Esgotado</span>
               ) : product.stock <= 5 ? (
                 <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-yellow-500/10 text-yellow-500 font-medium text-xs">Acabando ({product.stock} un.)</span>
@@ -162,6 +166,10 @@ export default function ProdutoDetalhe() {
             </div>
 
             <Button onClick={() => {
+              if (consultOnly) {
+                toast.info(`${product.name} está disponível sob consulta`)
+                return
+              }
               if (product.stock <= 0 || product.status === "inactive") {
                 toast.error(`${product.name} está fora de estoque`)
                 return
@@ -169,8 +177,8 @@ export default function ProdutoDetalhe() {
               addItem(product); toast.success(`${product.name} adicionado ao carrinho!`)
             }}
               className="w-full h-12 bg-primary hover:bg-primary/90 text-base font-sans gap-2"
-              disabled={product.stock <= 0 || product.status === "inactive"}>
-              <ShoppingCart className="w-5 h-5" /> {product.stock <= 0 ? "Esgotado" : "Adicionar ao Carrinho"}
+              disabled={unavailable}>
+              <ShoppingCart className="w-5 h-5" /> {consultOnly ? "Sob consulta" : product.stock <= 0 ? "Esgotado" : "Adicionar ao Carrinho"}
             </Button>
 
             <div className="flex items-center gap-6 text-xs font-sans text-muted-foreground pt-2">
@@ -179,16 +187,15 @@ export default function ProdutoDetalhe() {
             </div>
 
             {product.description && (
-              <div className="bg-card border border-border rounded-xl p-6">
+              <LiquidGlassCard className="p-6 py-6">
                 <h3 className="font-semibold text-foreground mb-3">Descrição</h3>
-                <p className="text-sm font-sans text-muted-foreground leading-relaxed whitespace-pre-line">{displayDesc}</p>
-                {hasLongDesc && (
-                  <button onClick={() => setDescExpanded(!descExpanded)}
-                    className="flex items-center gap-1 text-sm text-primary hover:underline mt-2 font-sans cursor-pointer">
-                    {descExpanded ? "Mostrar menos" : "Ler mais"} {descExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                  </button>
-                )}
-              </div>
+                <ExpandableText
+                  text={product.description}
+                  lines={5}
+                  threshold={360}
+                  className="whitespace-pre-line text-sm leading-relaxed text-muted-foreground font-sans"
+                />
+              </LiquidGlassCard>
             )}
           </motion.div>
         </div>

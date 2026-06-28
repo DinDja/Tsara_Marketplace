@@ -5,6 +5,15 @@ const nextConfig = {
   },
   images: {
     unoptimized: true,
+    remotePatterns: [
+      { protocol: "https", hostname: "luar.com.br" },
+      { protocol: "https", hostname: "www.luar.com.br" },
+      { protocol: "https", hostname: "s2-techtudo.glbimg.com" },
+      { protocol: "https", hostname: "lotusesoterismo.com.br" },
+      { protocol: "https", hostname: "unolife.com.br" },
+      { protocol: "https", hostname: "www.astrocentro.com.br" },
+      { protocol: "https", hostname: "i0.wp.com" },
+    ],
   },
 }
 

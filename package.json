@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "import:luar": "node scripts/import-luar-products.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
@@ -45,6 +46,7 @@
     "date-fns": "4.1.0",
     "embla-carousel-react": "8.6.0",
     "firebase": "^12.13.0",
+    "firebase-admin": "^14.1.0",
     "framer-motion": "^12.38.0",
     "input-otp": "1.4.2",
     "lottie-react": "^2.4.1",

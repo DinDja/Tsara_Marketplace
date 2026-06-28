@@ -7,6 +7,7 @@ export interface Product {
   rating: number
   reviews: number
   image: string
+  images?: string[]
   badge?: string
   stock: number
   sold: number
@@ -14,11 +15,24 @@ export interface Product {
   featured: boolean
   description?: string
   freeShipping?: boolean
+  priceOnRequest?: boolean
+  stockManaged?: boolean
+  source?: ProductSource
   createdAt: Date
   updatedAt: Date
 }
 
 export type ProductCategory = "Cristais" | "Velas" | "Incensos" | "Oráculos" | "Acessórios" | "Rituais"
+
+export interface ProductSource {
+  provider: "luar" | string
+  id: string
+  url?: string
+  categoryId?: string
+  categoryName?: string
+  images?: string[]
+  importedAt?: Date
+}
 
 export interface ConsultationType {
   id: string
@@ -88,6 +102,8 @@ export interface CartItem {
   freeShipping?: boolean
   status?: string
   stock?: number
+  priceOnRequest?: boolean
+  stockManaged?: boolean
 }
 
 export interface Order {
