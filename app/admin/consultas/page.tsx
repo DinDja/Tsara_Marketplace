@@ -3,7 +3,7 @@
 import { useState, useRef } from "react"
 import { motion } from "framer-motion"
 import {
-  Plus, MoreVertical, Edit, Trash2, Image as ImageIcon, Clock,
+  Plus, MoreVertical, Edit, Trash2, Image as ImageIcon, Clock, ChevronLeft, ChevronRight,
 } from "lucide-react"
 import { MoonIcon } from "@/components/moon-icon"
 import { Card, CardContent } from "@/components/ui/card"
@@ -19,8 +19,8 @@ import {
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { useAsyncData } from "@/lib/hooks/useAsync"
-import { getConsultationTypes, createConsultationType, updateConsultationType, deleteConsultationType } from "@/lib/services/consultations"
+import { useConsultationTypesPaginated } from "@/lib/hooks"
+import { createConsultationType, updateConsultationType, deleteConsultationType } from "@/lib/services/consultations"
 import type { ConsultationType } from "@/lib/services/consultations"
 import { fileToBase64 } from "@/lib/image"
 import { SkeletonTable } from "@/components/ui/data-skeleton"
@@ -32,7 +32,9 @@ const defaultForm = {
 }
 
 export default function AdminConsultas() {
-  const { data: types, loading, refetch } = useAsyncData(getConsultationTypes, [])
+  const { data: types, loading, total, page, hasMore, goToPage, refetch } = useConsultationTypesPaginated(20)
+  const pageSize = 20
+  const totalPages = Math.max(1, Math.ceil(total / pageSize))
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<ConsultationType | null>(null)
   const [form, setForm] = useState(defaultForm)
@@ -273,6 +275,22 @@ export default function AdminConsultas() {
           </CardContent>
         </Card>
       </motion.div>
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between px-2">
+          <p className="text-sm font-sans text-muted-foreground">
+            Pagina {page} de {totalPages} ({total} tipos)
+          </p>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" disabled={page <= 1 || loading} onClick={() => goToPage(page - 1)} className="gap-1 font-sans">
+              <ChevronLeft className="w-4 h-4" /> Anterior
+            </Button>
+            <Button variant="outline" size="sm" disabled={!hasMore || loading} onClick={() => goToPage(page + 1)} className="gap-1 font-sans">
+              Proximo <ChevronRight className="w-4 h-4" />
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

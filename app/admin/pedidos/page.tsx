@@ -1,10 +1,10 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
 import {
   Search, ShoppingCart, Clock, Package, Truck, CheckCircle2, XCircle, DollarSign,
-  Eye, MoreVertical, TrendingUp, AlertTriangle,
+  Eye, MoreVertical, ChevronLeft, ChevronRight,
 } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -20,7 +20,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { SkeletonTable, SkeletonStatsGrid } from "@/components/ui/data-skeleton"
-import { useOrders } from "@/lib/hooks"
+import { useOrdersPaginated } from "@/lib/hooks"
 import { updateOrder } from "@/lib/services"
 import { toast } from "sonner"
 import type { Order } from "@/lib/types"
@@ -44,10 +44,16 @@ function formatCurrency(v: number) {
 }
 
 export default function AdminPedidos() {
-  const { data: orders, loading, refetch } = useOrders()
+  const { data: orders, loading, total, page, hasMore, goToPage, setPage, refetch } = useOrdersPaginated()
   const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
   const [detailOrder, setDetailOrder] = useState<Order | null>(null)
+  const pageSize = 20
+  const totalPages = Math.max(1, Math.ceil(total / pageSize))
+
+  useEffect(() => {
+    setPage(1)
+  }, [statusFilter, setPage])
 
   const filtered = (orders || []).filter((o) => {
     const matchSearch = o.client.toLowerCase().includes(search.toLowerCase()) || o.id.includes(search)
@@ -56,7 +62,7 @@ export default function AdminPedidos() {
   })
 
   const stats = orders ? [
-    { name: "Total", value: String(orders.length), icon: ShoppingCart, color: "text-primary" },
+    { name: "Total", value: String(total), icon: ShoppingCart, color: "text-primary" },
     { name: "Pendentes", value: String(orders.filter((o) => o.status === "pending").length), icon: Clock, color: "text-yellow-500" },
     { name: "Processando", value: String(orders.filter((o) => o.status === "processing").length), icon: Package, color: "text-blue-500" },
     { name: "Enviados", value: String(orders.filter((o) => o.status === "shipped").length), icon: Truck, color: "text-purple-500" },
@@ -214,6 +220,22 @@ export default function AdminPedidos() {
             </table>
           </CardContent>
         </Card>
+      )}
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between px-2">
+          <p className="text-sm font-sans text-muted-foreground">
+            Pagina {page} de {totalPages} ({total} pedidos)
+          </p>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" disabled={page <= 1 || loading} onClick={() => goToPage(page - 1)} className="gap-1 font-sans">
+              <ChevronLeft className="w-4 h-4" /> Anterior
+            </Button>
+            <Button variant="outline" size="sm" disabled={!hasMore || loading} onClick={() => goToPage(page + 1)} className="gap-1 font-sans">
+              Proximo <ChevronRight className="w-4 h-4" />
+            </Button>
+          </div>
+        </div>
       )}
 
       <Dialog open={!!detailOrder} onOpenChange={(v) => { if (!v) setDetailOrder(null) }}>

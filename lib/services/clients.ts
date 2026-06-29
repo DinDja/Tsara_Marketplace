@@ -1,8 +1,10 @@
 import {
   collection, getDocs, getDoc, doc, addDoc, updateDoc, deleteDoc, Timestamp,
+  limit, orderBy, startAfter, getCountFromServer, query, where,
 } from "firebase/firestore"
 import { db, FIRESTORE_COLLECTIONS } from "@/lib/firebase/config"
 import type { Client } from "@/lib/types"
+import type { PaginatedResult } from "./products"
 
 const col = collection(db, FIRESTORE_COLLECTIONS.clients)
 
@@ -81,6 +83,35 @@ export async function searchClients(query_str: string): Promise<Client[]> {
     return all.filter((c) => c.name.toLowerCase().includes(q) || c.email.toLowerCase().includes(q))
   } catch {
     return []
+  }
+}
+
+export async function getClientsPaginated(
+  page: number,
+  pageSize = 20
+): Promise<PaginatedResult<Client>> {
+  try {
+    const countSnap = await getCountFromServer(col)
+    const total = countSnap.data().count
+
+    const dataConstraints: any[] = [orderBy("name")]
+
+    if (page > 1) {
+      const prevQ = query(col, ...dataConstraints, limit((page - 1) * pageSize))
+      const prevSnap = await getDocs(prevQ)
+      if (prevSnap.docs.length > 0) {
+        dataConstraints.push(startAfter(prevSnap.docs[prevSnap.docs.length - 1]))
+      }
+    }
+
+    dataConstraints.push(limit(pageSize))
+    const snap = await getDocs(query(col, ...dataConstraints))
+    const docs = snap.docs.map(mapDoc)
+    const totalPages = Math.ceil(total / pageSize)
+
+    return { data: docs, total, hasMore: page < totalPages }
+  } catch {
+    return { data: [], total: 0, hasMore: false }
   }
 }
 

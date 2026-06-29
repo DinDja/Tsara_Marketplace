@@ -1,28 +1,27 @@
-import { collection, getDocs } from "firebase/firestore"
+import { collection, getDocs, getCountFromServer, query, where, orderBy, limit } from "firebase/firestore"
 import { db, FIRESTORE_COLLECTIONS } from "@/lib/firebase/config"
 import type { DashboardStats } from "@/lib/types"
 
 export async function getDashboardStats(): Promise<DashboardStats> {
   try {
-    const [clientsSnap, appointmentsSnap, productsSnap] = await Promise.all([
-      getDocs(collection(db, FIRESTORE_COLLECTIONS.clients)),
-      getDocs(collection(db, FIRESTORE_COLLECTIONS.appointments)),
-      getDocs(collection(db, FIRESTORE_COLLECTIONS.products)),
+    const [clientsCount, appointmentsCount, completedSnap, productsSnap] = await Promise.all([
+      getCountFromServer(collection(db, FIRESTORE_COLLECTIONS.clients)),
+      getCountFromServer(collection(db, FIRESTORE_COLLECTIONS.appointments)),
+      getDocs(query(collection(db, FIRESTORE_COLLECTIONS.appointments), where("status", "==", "completed"))),
+      getDocs(query(collection(db, FIRESTORE_COLLECTIONS.products))),
     ])
 
-    const appointments = appointmentsSnap.docs.map((d) => ({ id: d.id, ...d.data() } as any))
-    const completed = appointments.filter((a) => a.status === "completed")
-    const totalRevenue = completed.reduce((acc, a) => acc + (a.price || 0), 0)
+    const totalRevenue = completedSnap.docs.reduce((acc, d) => acc + (d.data().price || 0), 0)
     const productsSold = productsSnap.docs.reduce((acc, d) => acc + (d.data().sold || 0), 0)
 
     return {
       revenue: totalRevenue,
       revenueChange: "",
-      appointments: appointments.length,
+      appointments: appointmentsCount.data().count,
       appointmentsChange: "",
       productsSold,
       productsSoldChange: "",
-      newClients: clientsSnap.size,
+      newClients: clientsCount.data().count,
       newClientsChange: "",
     }
   } catch {
@@ -32,16 +31,15 @@ export async function getDashboardStats(): Promise<DashboardStats> {
 
 export async function getTopProducts(): Promise<{ name: string; sales: number; revenue: string }[]> {
   try {
-    const snap = await getDocs(collection(db, FIRESTORE_COLLECTIONS.products))
-    return snap.docs
-      .map((d) => ({ id: d.id, ...d.data() } as any))
-      .sort((a, b) => (b.sold || 0) - (a.sold || 0))
-      .slice(0, 4)
-      .map((p) => ({
+    const snap = await getDocs(query(collection(db, FIRESTORE_COLLECTIONS.products), orderBy("sold", "desc"), limit(4)))
+    return snap.docs.map((d) => {
+      const p = d.data() as any
+      return {
         name: p.name || "Produto",
         sales: p.sold || 0,
         revenue: `R$ ${((p.sold || 0) * (p.price || 0)).toFixed(0)}`,
-      }))
+      }
+    })
   } catch {
     return []
   }
@@ -49,8 +47,8 @@ export async function getTopProducts(): Promise<{ name: string; sales: number; r
 
 export async function getRecentAppointments(): Promise<{ id: number; client: string; type: string; date: string; status: string }[]> {
   try {
-    const snap = await getDocs(collection(db, FIRESTORE_COLLECTIONS.appointments))
-    return snap.docs.slice(0, 5).map((d, i) => {
+    const snap = await getDocs(query(collection(db, FIRESTORE_COLLECTIONS.appointments), orderBy("createdAt", "desc"), limit(5)))
+    return snap.docs.map((d, i) => {
       const data = d.data()
       return {
         id: i + 1,
@@ -67,8 +65,8 @@ export async function getRecentAppointments(): Promise<{ id: number; client: str
 
 export async function getRecentOrders() {
   try {
-    const snap = await getDocs(collection(db, FIRESTORE_COLLECTIONS.orders))
-    return snap.docs.slice(0, 4).map((d) => {
+    const snap = await getDocs(query(collection(db, FIRESTORE_COLLECTIONS.orders), orderBy("createdAt", "desc"), limit(4)))
+    return snap.docs.map((d) => {
       const data = d.data()
       return {
         id: d.id,

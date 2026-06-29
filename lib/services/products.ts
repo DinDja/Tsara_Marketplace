@@ -124,6 +124,24 @@ export async function getProductsByCategory(category: string): Promise<Product[]
   }
 }
 
+export async function getProductsByCategoryLimited(
+  category: string,
+  limitCount: number
+): Promise<Product[]> {
+  try {
+    if (!category || category === "all") {
+      const q = query(col, orderBy("name"), limit(limitCount))
+      const snap = await getDocs(q)
+      return snap.docs.map(mapDoc)
+    }
+    const q = query(col, where("category", "==", category), orderBy("name"), limit(limitCount))
+    const snap = await getDocs(q)
+    return snap.docs.map(mapDoc)
+  } catch {
+    return []
+  }
+}
+
 export async function createProduct(data: Omit<Product, "id" | "createdAt" | "updatedAt">): Promise<Product> {
   const now = Timestamp.now()
   const payload: any = { ...data, createdAt: now, updatedAt: now }

@@ -1,14 +1,13 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { motion } from "framer-motion"
-import { ArrowLeft, CalendarCheck, Loader2, ShieldCheck, Sparkles, Video } from "lucide-react"
+import { ArrowLeft, CalendarCheck, ChevronLeft, ChevronRight, Loader2, ShieldCheck, Sparkles, Video } from "lucide-react"
 import { MoonIcon } from "@/components/moon-icon"
 import { Button } from "@/components/ui/button"
 import { EmptyScheduleState, SchedulingTypeCard } from "@/components/scheduling"
-import { getConsultationTypes } from "@/lib/services"
-import type { ConsultationType } from "@/lib/services/consultations"
+import { useConsultationTypesPaginated } from "@/lib/hooks"
 
 const processSteps = [
   { icon: Sparkles, label: "Escolha o atendimento", text: "Compare objetivos, duracao e valor." },
@@ -17,24 +16,10 @@ const processSteps = [
 ]
 
 export default function ConsultasPage() {
-  const [types, setTypes] = useState<ConsultationType[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    let mounted = true
-    getConsultationTypes()
-      .then((data) => {
-        if (mounted) setTypes(data)
-      })
-      .catch(() => {
-        if (mounted) setError("Nao foi possivel carregar as consultas.")
-      })
-      .finally(() => {
-        if (mounted) setLoading(false)
-      })
-    return () => { mounted = false }
-  }, [])
+  const { data: types, loading, total, page, hasMore, goToPage } = useConsultationTypesPaginated(20)
+  const pageSize = 20
+  const totalPages = Math.max(1, Math.ceil(total / pageSize))
+  const error = !loading && types.length === 0 ? "Nao foi possivel carregar as consultas." : null
 
   return (
     <div className="min-h-screen bg-background">
@@ -124,6 +109,20 @@ export default function ConsultasPage() {
               </motion.div>
             ))}
           </motion.div>
+        )}
+
+        {!loading && !error && totalPages > 1 && (
+          <div className="mt-10 flex items-center justify-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => goToPage(page - 1)} disabled={page <= 1 || loading} className="gap-1 font-sans">
+              <ChevronLeft className="h-4 w-4" /> Anterior
+            </Button>
+            <span className="px-4 text-sm font-sans text-muted-foreground">
+              Pagina {page} de {totalPages}
+            </span>
+            <Button variant="outline" size="sm" onClick={() => goToPage(page + 1)} disabled={!hasMore || loading} className="gap-1 font-sans">
+              Proximo <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
         )}
 
         <div className="mt-10 flex justify-center">

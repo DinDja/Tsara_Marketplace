@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { motion } from "framer-motion"
-import { ArrowLeft, Calendar, Clock, XCircle, Loader2 } from "lucide-react"
+import { ArrowLeft, Calendar, Clock, XCircle, Loader2, ChevronLeft, ChevronRight } from "lucide-react"
 import { MoonIcon } from "@/components/moon-icon"
 import { Button } from "@/components/ui/button"
 import { CardContent } from "@/components/ui/card"
@@ -17,7 +17,8 @@ import {
 import { Textarea } from "@/components/ui/textarea"
 import { EmptyScheduleState, ScheduleStatusBadge } from "@/components/scheduling"
 import { useAuth } from "@/lib/contexts/auth-context"
-import { getAppointmentsByClient, updateAppointmentStatus } from "@/lib/services"
+import { useAppointmentsByClientPaginated } from "@/lib/hooks"
+import { updateAppointmentStatus } from "@/lib/services"
 import { formatPrice } from "@/lib/utils"
 import { toast } from "sonner"
 import type { Appointment } from "@/lib/types"
@@ -25,17 +26,19 @@ import type { Appointment } from "@/lib/types"
 export default function MinhasConsultas() {
   const { user, loading } = useAuth()
   const router = useRouter()
-  const [appointments, setAppointments] = useState<Appointment[]>([])
-  const [loadingData, setLoadingData] = useState(true)
+  const { data: appointments, loading: loadingData, page, total, hasMore, goToPage } = useAppointmentsByClientPaginated(
+    user?.id ?? "",
+    user?.email ?? "",
+    10
+  )
   const [cancelTarget, setCancelTarget] = useState<Appointment | null>(null)
   const [cancelReason, setCancelReason] = useState("")
   const [cancelling, setCancelling] = useState(false)
+  const pageSize = 10
+  const totalPages = Math.max(1, Math.ceil(total / pageSize))
 
   useEffect(() => {
     if (!loading && !user) { router.push("/login"); return }
-    if (user) {
-      getAppointmentsByClient(user.id, user.email).then(setAppointments).finally(() => setLoadingData(false))
-    }
   }, [user, loading, router])
 
   const canCancel = (apt: Appointment) =>
@@ -45,8 +48,8 @@ export default function MinhasConsultas() {
     if (!cancelTarget) return
     setCancelling(true)
     try {
-      const updated = await updateAppointmentStatus(cancelTarget.id, "cancelled", cancelReason.trim() || undefined)
-      setAppointments((prev) => prev.map((a) => a.id === updated.id ? updated : a))
+      await updateAppointmentStatus(cancelTarget.id, "cancelled", cancelReason.trim() || undefined)
+      goToPage(page)
       toast.success("Consulta cancelada")
     } catch (err: any) {
       toast.error(err?.code ? `Erro ao cancelar (${err.code})` : "Erro ao cancelar. Tente novamente.")
@@ -140,6 +143,20 @@ export default function MinhasConsultas() {
                   </motion.div>
                 )
               })}
+            </div>
+          )}
+
+          {totalPages > 1 && (
+            <div className="mt-8 flex items-center justify-center gap-2">
+              <Button variant="outline" size="sm" onClick={() => goToPage(page - 1)} disabled={page <= 1 || loadingData} className="gap-1 font-sans">
+                <ChevronLeft className="w-4 h-4" /> Anterior
+              </Button>
+              <span className="px-4 text-sm font-sans text-muted-foreground">
+                Pagina {page} de {totalPages}
+              </span>
+              <Button variant="outline" size="sm" onClick={() => goToPage(page + 1)} disabled={!hasMore || loadingData} className="gap-1 font-sans">
+                Proximo <ChevronRight className="w-4 h-4" />
+              </Button>
             </div>
           )}
         </motion.div>

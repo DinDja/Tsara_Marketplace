@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
   Search,
@@ -14,6 +14,8 @@ import {
   Trash2,
   Eye,
   Users,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -26,12 +28,14 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { SkeletonClientCards, SkeletonStatsGrid } from "@/components/ui/data-skeleton";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { useClients } from "@/lib/hooks";
+import { useClientsPaginated } from "@/lib/hooks";
 import { toast } from "sonner";
 
 export default function AdminClientes() {
   const [searchQuery, setSearchQuery] = useState("");
-  const { data: clients, loading } = useClients();
+  const { data: clients, loading, total, page, hasMore, goToPage } = useClientsPaginated(20);
+  const pageSize = 20;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   const filteredClients = (clients || []).filter(
     (client) =>
@@ -39,7 +43,7 @@ export default function AdminClientes() {
       client.email.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const totalClients = clients?.length || 0;
+  const totalClients = total;
   const vipClients = clients?.filter((c) => c.vip).length || 0;
   const totalRevenue = clients?.reduce((acc, c) => acc + c.totalSpent, 0) || 0;
   const avgSpent = totalClients > 0 ? totalRevenue / totalClients : 0;
@@ -165,6 +169,22 @@ export default function AdminClientes() {
           </div>
         )}
       </motion.div>
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between px-2">
+          <p className="text-sm font-sans text-muted-foreground">
+            Pagina {page} de {totalPages} ({total} clientes)
+          </p>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" disabled={page <= 1 || loading} onClick={() => goToPage(page - 1)} className="gap-1 font-sans">
+              <ChevronLeft className="w-4 h-4" /> Anterior
+            </Button>
+            <Button variant="outline" size="sm" disabled={!hasMore || loading} onClick={() => goToPage(page + 1)} className="gap-1 font-sans">
+              Proximo <ChevronRight className="w-4 h-4" />
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

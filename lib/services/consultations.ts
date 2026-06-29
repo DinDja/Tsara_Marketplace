@@ -1,8 +1,10 @@
 import {
   collection, getDocs, getDoc, doc, addDoc, updateDoc, deleteDoc, Timestamp,
+  limit, orderBy, startAfter, getCountFromServer, query,
 } from "firebase/firestore"
 import { db } from "@/lib/firebase/config"
 import { encodeImage, decodeImage } from "@/lib/image"
+import type { PaginatedResult } from "./products"
 
 export interface ConsultationType {
   id: string
@@ -48,6 +50,15 @@ export async function getConsultationTypes(): Promise<ConsultationType[]> {
   }
 }
 
+export async function getConsultationTypesLimited(limitCount: number): Promise<ConsultationType[]> {
+  try {
+    const snap = await getDocs(query(col, orderBy("name"), limit(limitCount)))
+    return snap.docs.map(mapDoc)
+  } catch {
+    return []
+  }
+}
+
 export async function getConsultationTypeById(id: string): Promise<ConsultationType | null> {
   try {
     const snap = await getDoc(doc(db, "consultations", id))
@@ -77,4 +88,33 @@ export async function updateConsultationType(id: string, data: Partial<Consultat
 
 export async function deleteConsultationType(id: string): Promise<void> {
   await deleteDoc(doc(db, "consultations", id))
+}
+
+export async function getConsultationTypesPaginated(
+  page: number,
+  pageSize = 20
+): Promise<PaginatedResult<ConsultationType>> {
+  try {
+    const countSnap = await getCountFromServer(col)
+    const total = countSnap.data().count
+
+    const dataConstraints: any[] = [orderBy("name")]
+
+    if (page > 1) {
+      const prevQ = query(col, ...dataConstraints, limit((page - 1) * pageSize))
+      const prevSnap = await getDocs(prevQ)
+      if (prevSnap.docs.length > 0) {
+        dataConstraints.push(startAfter(prevSnap.docs[prevSnap.docs.length - 1]))
+      }
+    }
+
+    dataConstraints.push(limit(pageSize))
+    const snap = await getDocs(query(col, ...dataConstraints))
+    const docs = snap.docs.map(mapDoc)
+    const totalPages = Math.ceil(total / pageSize)
+
+    return { data: docs, total, hasMore: page < totalPages }
+  } catch {
+    return { data: [], total: 0, hasMore: false }
+  }
 }

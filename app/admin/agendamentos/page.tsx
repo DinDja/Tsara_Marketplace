@@ -6,6 +6,8 @@ import {
   CalendarCheck,
   CalendarDays,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   Clock,
   DollarSign,
   Loader2,
@@ -54,10 +56,11 @@ import {
 import { Textarea } from "@/components/ui/textarea"
 import { SkeletonAppointmentList } from "@/components/ui/data-skeleton"
 import { EmptyScheduleState, ScheduleStatusBadge } from "@/components/scheduling"
-import { useAppointments } from "@/lib/hooks"
+import { useAppointmentsPaginated } from "@/lib/hooks"
 import {
   createAppointment,
   deleteAppointment,
+  getAppointmentsByDate,
   getConsultationTypes,
   getOccupiedSlots,
   updateAppointmentStatus,
@@ -110,8 +113,10 @@ function formatDisplayDate(date: string) {
 }
 
 export default function AdminAgendamentosPage() {
-  const { data, loading, refetch } = useAppointments()
+  const { data, loading, total, page, hasMore, goToPage, setPage, refetch } = useAppointmentsPaginated()
   const appointments = data ?? []
+  const pageSize = 20
+  const totalPages = Math.max(1, Math.ceil(total / pageSize))
 
   const [types, setTypes] = useState<ConsultationType[]>([])
   const [loadingTypes, setLoadingTypes] = useState(true)
@@ -123,9 +128,28 @@ export default function AdminAgendamentosPage() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState(emptyForm)
+  const [dayAppointments, setDayAppointments] = useState<Appointment[]>([])
+  const [loadingDay, setLoadingDay] = useState(false)
 
   const selectedDateKey = toDateKey(selectedDate)
   const todayKey = toDateKey(new Date())
+
+  useEffect(() => {
+    setPage(1)
+  }, [filterStatus, setPage])
+
+  useEffect(() => {
+    let mounted = true
+    setLoadingDay(true)
+    getAppointmentsByDate(selectedDateKey)
+      .then((items) => {
+        if (mounted) setDayAppointments(items)
+      })
+      .finally(() => {
+        if (mounted) setLoadingDay(false)
+      })
+    return () => { mounted = false }
+  }, [selectedDateKey, dialogOpen])
 
   useEffect(() => {
     let mounted = true
@@ -175,14 +199,6 @@ export default function AdminAgendamentosPage() {
       .sort((a, b) => appointmentDateTime(a) - appointmentDateTime(b))
   }, [appointments, filterDate, filterStatus, filterType, searchQuery])
 
-  const dayAppointments = useMemo(
-    () =>
-      appointments
-        .filter((appointment) => appointment.date === selectedDateKey)
-        .sort((a, b) => a.time.localeCompare(b.time)),
-    [appointments, selectedDateKey],
-  )
-
   const slotMap = useMemo(() => {
     const map = new Map<string, Appointment>()
     dayAppointments
@@ -191,10 +207,10 @@ export default function AdminAgendamentosPage() {
     return map
   }, [dayAppointments])
 
-  const todayAppointments = appointments.filter((appointment) => appointment.date === todayKey)
-  const pendingCount = appointments.filter((appointment) => appointment.status === "pending").length
-  const confirmedCount = appointments.filter((appointment) => appointment.status === "confirmed").length
-  const todayRevenue = todayAppointments
+  const todayAppointments = dayAppointments.filter((appointment) => appointment.date === todayKey)
+  const pendingCount = filteredAppointments.filter((appointment) => appointment.status === "pending").length
+  const confirmedCount = filteredAppointments.filter((appointment) => appointment.status === "confirmed").length
+  const todayRevenue = dayAppointments
     .filter((appointment) => appointment.status !== "cancelled")
     .reduce((sum, appointment) => sum + appointment.price, 0)
 
@@ -442,16 +458,33 @@ export default function AdminAgendamentosPage() {
                 onAction={openCreateDialog}
               />
             ) : (
-              <div className="space-y-3">
-                {filteredAppointments.map((appointment) => (
-                  <AppointmentRow
-                    key={appointment.id}
-                    appointment={appointment}
-                    onStatusUpdate={handleStatusUpdate}
-                    onDelete={handleDelete}
-                  />
-                ))}
-              </div>
+              <>
+                <div className="space-y-3">
+                  {filteredAppointments.map((appointment) => (
+                    <AppointmentRow
+                      key={appointment.id}
+                      appointment={appointment}
+                      onStatusUpdate={handleStatusUpdate}
+                      onDelete={handleDelete}
+                    />
+                  ))}
+                </div>
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-between pt-4">
+                    <p className="text-sm font-sans text-muted-foreground">
+                      Pagina {page} de {totalPages} ({total} agendamentos)
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <Button variant="outline" size="sm" disabled={page <= 1 || loading} onClick={() => goToPage(page - 1)} className="gap-1 font-sans">
+                        <ChevronLeft className="size-4" /> Anterior
+                      </Button>
+                      <Button variant="outline" size="sm" disabled={!hasMore || loading} onClick={() => goToPage(page + 1)} className="gap-1 font-sans">
+                        Proximo <ChevronRight className="size-4" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </CardContent>
         </LiquidGlassCard>

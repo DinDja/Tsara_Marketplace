@@ -4,14 +4,14 @@ import { useState, useEffect } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
-import { Search, ShoppingCart, Loader2, MapPin, Package, ChevronDown, ChevronUp, CreditCard, Banknote, Truck, CheckCircle2, Clock, XCircle, ArrowLeft, RotateCcw, HelpCircle, Download } from "lucide-react"
+import { Search, ShoppingCart, Loader2, MapPin, Package, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, CreditCard, Banknote, Truck, CheckCircle2, Clock, XCircle, ArrowLeft, RotateCcw, HelpCircle, Download } from "lucide-react"
 import { MoonIcon } from "@/components/moon-icon"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { useAuth } from "@/lib/contexts/auth-context"
-import { getOrdersByClient } from "@/lib/services"
+import { useOrdersByClientPaginated } from "@/lib/hooks"
 import { cn } from "@/lib/utils"
 import type { Order } from "@/lib/types"
 
@@ -40,21 +40,22 @@ function formatDateShort(d: Date) {
 export default function MeusPedidos() {
   const { user, loading } = useAuth()
   const router = useRouter()
-  const [orders, setOrders] = useState<Order[]>([])
-  const [loadingData, setLoadingData] = useState(true)
+  const ordersHook = useOrdersByClientPaginated(user?.id ?? "", 10)
+  const { data: orders, loading: loadingData, page, total, hasMore, goToPage, setPage } = ordersHook
   const [activeTab, setActiveTab] = useState("all")
   const [search, setSearch] = useState("")
   const [expandedId, setExpandedId] = useState<string | null>(null)
 
   useEffect(() => {
     if (!loading && !user) { router.push("/login"); return }
-    if (user) {
-      getOrdersByClient(user.id).then(setOrders).finally(() => setLoadingData(false))
-    }
   }, [user, loading, router])
 
+  useEffect(() => {
+    setPage(1)
+  }, [activeTab, setPage])
+
   const tabs = [
-    { key: "all", label: "Todos", count: orders.length },
+    { key: "all", label: "Todos", count: total },
     ...statusSteps.map((s) => ({
       key: s,
       label: statusConfig[s].label,
@@ -71,6 +72,8 @@ export default function MeusPedidos() {
   })
 
   const totalSpent = orders.filter((o) => o.status === "delivered").reduce((s, o) => s + o.total, 0)
+  const pageSize = 10
+  const totalPages = Math.max(1, Math.ceil(total / pageSize))
 
   if (loading || loadingData) {
     return (
@@ -103,7 +106,7 @@ export default function MeusPedidos() {
             <div>
               <h1 className="text-3xl lg:text-4xl font-bold text-foreground">Meus Pedidos</h1>
               <p className="text-sm font-sans text-muted-foreground mt-1">
-                {orders.length} {orders.length === 1 ? "pedido realizado" : "pedidos realizados"}
+                {total} {total === 1 ? "pedido realizado" : "pedidos realizados"}
                 {totalSpent > 0 && ` \u2022 ${formatCurrency(totalSpent)} em entregues`}
               </p>
             </div>
@@ -331,6 +334,20 @@ export default function MeusPedidos() {
                   </motion.div>
                 )
               })}
+            </div>
+          )}
+
+          {totalPages > 1 && (
+            <div className="mt-8 flex items-center justify-center gap-2">
+              <Button variant="outline" size="sm" onClick={() => goToPage(page - 1)} disabled={page <= 1 || loadingData} className="gap-1 font-sans">
+                <ChevronLeft className="w-4 h-4" /> Anterior
+              </Button>
+              <span className="px-4 text-sm font-sans text-muted-foreground">
+                Pagina {page} de {totalPages}
+              </span>
+              <Button variant="outline" size="sm" onClick={() => goToPage(page + 1)} disabled={!hasMore || loadingData} className="gap-1 font-sans">
+                Proximo <ChevronRight className="w-4 h-4" />
+              </Button>
             </div>
           )}
         </motion.div>

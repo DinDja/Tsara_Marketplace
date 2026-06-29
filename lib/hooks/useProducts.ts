@@ -1,10 +1,10 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useEffect } from "react"
 import { useAsyncData } from "./useAsync"
-import { getProducts, getProductById, getFeaturedProducts, getProductsByCategory, getProductsPaginated } from "@/lib/services"
+import { useFirestorePagination } from "./useFirestorePagination"
+import { getProducts, getProductById, getFeaturedProducts, getProductsByCategory, getProductsByCategoryLimited, getProductsPaginated } from "@/lib/services"
 import type { Product } from "@/lib/types"
-import type { PaginatedResult } from "@/lib/services/products"
 
 export function useProducts() {
   return useAsyncData(getProducts, [])
@@ -22,26 +22,22 @@ export function useProductsByCategory(category: string) {
   return useAsyncData(() => getProductsByCategory(category), [category])
 }
 
-export function useProductsPaginated(filters?: { category?: string; search?: string }) {
-  const [page, setPage] = useState(1)
-  const [result, setResult] = useState<PaginatedResult<Product>>({ data: [], total: 0, hasMore: false })
-  const [loading, setLoading] = useState(true)
+export function useProductsByCategoryLimited(category: string, limitCount: number) {
+  return useAsyncData(() => getProductsByCategoryLimited(category, limitCount), [category, limitCount])
+}
 
-  const fetchPage = useCallback(async (p: number) => {
-    setLoading(true)
-    const res = await getProductsPaginated(p, filters)
-    setResult(res)
-    setLoading(false)
-  }, [filters?.category, filters?.search])
+export function useProductsPaginated(filters?: { category?: string; search?: string }) {
+  const hook = useFirestorePagination<Product>(
+    (page) => getProductsPaginated(page, filters),
+    { deps: [filters?.category, filters?.search] }
+  )
 
   useEffect(() => {
-    fetchPage(page)
-  }, [page, fetchPage])
+    hook.setPage(1)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters?.category, filters?.search])
 
-  const goToPage = (p: number) => setPage(p)
-  const refetch = useCallback(() => fetchPage(page), [page, fetchPage])
-
-  return { ...result, loading, page, goToPage, refetch }
+  return hook
 }
 
 export type { Product }

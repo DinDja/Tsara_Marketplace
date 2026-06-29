@@ -35,10 +35,10 @@ export function SkeletonProductGrid({ count = 6 }: { count?: number }) {
   )
 }
 
-export function SkeletonStatsGrid() {
+export function SkeletonStatsGrid({ count = 4 }: { count?: number }) {
   return (
     <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-      {Array.from({ length: 4 }).map((_, i) => (
+      {Array.from({ length: count }).map((_, i) => (
         <Card key={i} className="bg-card border-border p-6">
           <div className="flex items-center justify-between">
             <Pulse className="w-12 h-12 rounded-lg" />

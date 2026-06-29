@@ -1,37 +1,42 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { motion } from "framer-motion"
-import { ArrowLeft } from "lucide-react"
+import { ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react"
 
 import { MoonIcon } from "@/components/moon-icon"
 import { ProductCard } from "@/components/product-card"
 import { SkeletonProductGrid } from "@/components/ui/data-skeleton"
+import { Button } from "@/components/ui/button"
 import { useCart } from "@/lib/contexts/cart-context"
 import { PRODUCT_CATEGORIES } from "@/lib/constants"
-import { useProducts } from "@/lib/hooks"
+import { useProductsPaginated } from "@/lib/hooks"
+import type { Product } from "@/lib/types"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 
 const categories = PRODUCT_CATEGORIES
 
-function isConsultOnly(product: NonNullable<ReturnType<typeof useProducts>["data"]>[number]) {
+function isConsultOnly(product: Product) {
   return product.priceOnRequest || product.stockManaged === false || product.price <= 0
 }
 
 export default function ProdutosPage() {
   const [activeCategory, setActiveCategory] = useState("all")
-  const { data: products, loading } = useProducts()
+  const pageSize = activeCategory !== "all" ? 30 : 12
+  const { data: products, loading, page, total, hasMore, goToPage, setPage } = useProductsPaginated(
+    activeCategory !== "all" ? { category: activeCategory } : undefined
+  )
   const { addItem } = useCart()
 
-  const filtered = !products
-    ? []
-    : activeCategory === "all"
-      ? products
-      : products.filter((product) => product.category === activeCategory)
+  useEffect(() => {
+    setPage(1)
+  }, [activeCategory, setPage])
 
-  const handleAddToCart = (product: NonNullable<typeof products>[number]) => {
+  const totalPages = Math.max(1, Math.ceil(total / pageSize))
+
+  const handleAddToCart = (product: Product) => {
     if (isConsultOnly(product)) {
       toast.info(`${product.name} esta disponivel sob consulta`)
       return
@@ -101,7 +106,7 @@ export default function ProdutosPage() {
 
           {loading ? (
             <SkeletonProductGrid />
-          ) : filtered.length === 0 ? (
+          ) : products.length === 0 ? (
             <div className="py-16 text-center">
               <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-secondary/50 text-3xl opacity-50">
                 *
@@ -109,19 +114,47 @@ export default function ProdutosPage() {
               <p className="text-muted-foreground font-sans">Nenhum produto encontrado nesta categoria.</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 md:gap-8">
-              {filtered.map((product, index) => (
-                <motion.div
-                  key={product.id}
-                  initial={{ opacity: 0, y: 30 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: Math.min(index * 0.03, 0.35) }}
-                  className="h-full"
-                >
-                  <ProductCard product={product} onAddToCart={handleAddToCart} />
-                </motion.div>
-              ))}
-            </div>
+            <>
+              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 md:gap-8">
+                {products.map((product, index) => (
+                  <motion.div
+                    key={product.id}
+                    initial={{ opacity: 0, y: 30 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: Math.min(index * 0.03, 0.35) }}
+                    className="h-full"
+                  >
+                    <ProductCard product={product} onAddToCart={handleAddToCart} />
+                  </motion.div>
+                ))}
+              </div>
+
+              {totalPages > 1 && (
+                <div className="mt-10 flex items-center justify-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => goToPage(page - 1)}
+                    disabled={page <= 1 || loading}
+                    className="gap-1"
+                  >
+                    <ChevronLeft className="h-4 w-4" /> Anterior
+                  </Button>
+                  <span className="px-4 text-sm font-sans text-muted-foreground">
+                    Pagina {page} de {totalPages}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => goToPage(page + 1)}
+                    disabled={!hasMore || loading}
+                    className="gap-1"
+                  >
+                    Proximo <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
+            </>
           )}
         </motion.div>
       </main>

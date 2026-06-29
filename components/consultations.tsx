@@ -1,13 +1,11 @@
 "use client"
 
-import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
 import { Video, Phone, MapPin, ArrowRight, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import { SchedulingTypeCard } from "@/components/scheduling"
-import { getConsultationTypes } from "@/lib/services"
-import type { ConsultationType } from "@/lib/services/consultations"
+import { useConsultationTypesLimited } from "@/lib/hooks"
 
 const modalities = [
   { icon: Video, label: "Online", description: "Via Google Meet ou Zoom" },
@@ -16,12 +14,7 @@ const modalities = [
 ]
 
 export function Consultations() {
-  const [types, setTypes] = useState<ConsultationType[]>([])
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    getConsultationTypes().then((data) => { setTypes(data); setLoading(false) })
-  }, [])
+  const { data: types, loading } = useConsultationTypesLimited(3)
 
   return (
     <section id="consultas" className="py-24 md:py-32 relative overflow-hidden">
@@ -75,7 +68,7 @@ export function Consultations() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
-            {types.slice(0, 3).map((consultation, index) => (
+            {types.map((consultation, index) => (
               <motion.div
                 key={consultation.id}
                 initial={{ opacity: 0, y: 30 }}

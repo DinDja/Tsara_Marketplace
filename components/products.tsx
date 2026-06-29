@@ -10,22 +10,23 @@ import { Button } from "@/components/ui/button"
 import { SkeletonProductGrid } from "@/components/ui/data-skeleton"
 import { useCart } from "@/lib/contexts/cart-context"
 import { PRODUCT_CATEGORIES } from "@/lib/constants"
-import { useProductsByCategory } from "@/lib/hooks"
+import { useProductsByCategoryLimited } from "@/lib/hooks"
+import type { Product } from "@/lib/types"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 
 const categories = PRODUCT_CATEGORIES
 
-function isConsultOnly(product: NonNullable<ReturnType<typeof useProductsByCategory>["data"]>[number]) {
+function isConsultOnly(product: Product) {
   return product.priceOnRequest || product.stockManaged === false || product.price <= 0
 }
 
 export function Products() {
   const [activeCategory, setActiveCategory] = useState("all")
-  const { data: products, loading } = useProductsByCategory(activeCategory)
+  const { data: products, loading } = useProductsByCategoryLimited(activeCategory, 3)
   const { addItem } = useCart()
 
-  const handleAddToCart = (product: NonNullable<typeof products>[number]) => {
+  const handleAddToCart = (product: Product) => {
     if (isConsultOnly(product)) {
       toast.info(`${product.name} esta disponivel sob consulta`)
       return
@@ -110,7 +111,7 @@ export function Products() {
             viewport={{ once: true }}
             className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 md:gap-8"
           >
-            {products.slice(0, 3).map((product, index) => (
+            {products.map((product, index) => (
               <motion.div
                 key={product.id}
                 initial={{ opacity: 0, y: 30 }}

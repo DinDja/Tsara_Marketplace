@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
 import {
   Plus, Tag, Percent, Trash2, Copy, Calendar, DollarSign,
-  CheckCircle2, XCircle, Search,
+  CheckCircle2, XCircle, Search, ChevronLeft, ChevronRight,
 } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -19,7 +19,8 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { SkeletonTable } from "@/components/ui/data-skeleton"
-import { getCoupons, createCoupon, updateCoupon, deleteCoupon } from "@/lib/services"
+import { createCoupon, updateCoupon, deleteCoupon } from "@/lib/services"
+import { useCouponsPaginated } from "@/lib/hooks"
 import { toast } from "sonner"
 import type { Coupon } from "@/lib/types"
 
@@ -29,22 +30,14 @@ const emptyForm = {
 }
 
 export default function AdminCupons() {
-  const [coupons, setCoupons] = useState<Coupon[]>([])
-  const [loading, setLoading] = useState(true)
+  const { data: coupons, loading, total, page, hasMore, goToPage, refetch } = useCouponsPaginated(20)
+  const pageSize = 20
+  const totalPages = Math.max(1, Math.ceil(total / pageSize))
   const [search, setSearch] = useState("")
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<Coupon | null>(null)
   const [form, setForm] = useState(emptyForm)
   const [saving, setSaving] = useState(false)
-
-  const load = async () => {
-    setLoading(true)
-    const data = await getCoupons()
-    setCoupons(data)
-    setLoading(false)
-  }
-
-  useEffect(() => { load() }, [])
 
   const resetForm = () => { setForm(emptyForm); setEditing(null) }
 
@@ -72,13 +65,13 @@ export default function AdminCupons() {
         await createCoupon(payload)
         toast.success("Cupom criado!")
       }
-      setOpen(false); resetForm(); load()
+      setOpen(false); resetForm(); refetch()
     } catch (e) { toast.error("Erro ao salvar: " + (e instanceof Error ? e.message : "desconhecido")) }
     finally { setSaving(false) }
   }
 
   const handleDelete = async (id: string, code: string) => {
-    try { await deleteCoupon(id); toast.success(`Cupom ${code} excluído`); load() }
+    try { await deleteCoupon(id); toast.success(`Cupom ${code} excluído`); refetch() }
     catch { toast.error("Erro ao excluir") }
   }
 
@@ -186,58 +179,74 @@ export default function AdminCupons() {
                   </thead>
                   <tbody>
                     {filtered.map((coupon) => (
-                      <tr key={coupon.id} className="border-b border-border last:border-0 hover:bg-secondary/20 transition-colors">
-                        <td className="py-4 px-6">
-                          <div className="flex items-center gap-2">
-                            <Tag className="w-4 h-4 text-primary" />
-                            <span className="text-sm font-mono font-bold text-foreground">{coupon.code}</span>
-                            <button onClick={() => copyCode(coupon.code)} className="text-muted-foreground hover:text-foreground cursor-pointer">
-                              <Copy className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </td>
-                        <td className="py-4 px-6">
-                          <span className="text-sm font-sans font-medium text-foreground flex items-center gap-1">
-                            <Percent className="w-3.5 h-3.5 text-green-500" /> {coupon.discount}%
-                          </span>
-                        </td>
-                        <td className="py-4 px-6 text-right">
-                          <span className="text-sm font-sans text-foreground">{coupon.usedCount}{coupon.maxUses ? ` / ${coupon.maxUses}` : ""}</span>
-                        </td>
-                        <td className="py-4 px-6 text-right">
-                          <span className="text-sm font-sans text-muted-foreground">
-                            {coupon.minPurchase ? `R$ ${coupon.minPurchase.toFixed(2).replace(".", ",")}` : "—"}
-                          </span>
-                        </td>
-                        <td className="py-4 px-6 text-right">
-                          <span className="text-sm font-sans text-muted-foreground flex items-center justify-end gap-1">
-                            <Calendar className="w-3 h-3" />
-                            {coupon.expiresAt ? new Date(coupon.expiresAt).toLocaleDateString("pt-BR") : "—"}
-                          </span>
-                        </td>
-                        <td className="py-4 px-6 text-center">{statusBadge(coupon)}</td>
-                        <td className="py-4 px-6 text-right">
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon-sm"><span className="sr-only">Ações</span><span className="block w-1 h-1 rounded-full bg-muted-foreground" /></Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem className="gap-2 cursor-pointer" onClick={() => openEdit(coupon)}><Tag className="w-4 h-4" /> Editar</DropdownMenuItem>
-                              <DropdownMenuItem className="gap-2 cursor-pointer text-red-500" onClick={() => handleDelete(coupon.id, coupon.code)}>
-                                <Trash2 className="w-4 h-4" /> Excluir
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </motion.div>
+                    <tr key={coupon.id} className="border-b border-border last:border-0 hover:bg-secondary/20 transition-colors">
+                      <td className="py-4 px-6">
+                        <div className="flex items-center gap-2">
+                          <Tag className="w-4 h-4 text-primary" />
+                          <span className="text-sm font-mono font-bold text-foreground">{coupon.code}</span>
+                          <button onClick={() => copyCode(coupon.code)} className="text-muted-foreground hover:text-foreground cursor-pointer">
+                            <Copy className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </td>
+                      <td className="py-4 px-6">
+                        <span className="text-sm font-sans font-medium text-foreground flex items-center gap-1">
+                          <Percent className="w-3.5 h-3.5 text-green-500" /> {coupon.discount}%
+                        </span>
+                      </td>
+                      <td className="py-4 px-6 text-right">
+                        <span className="text-sm font-sans text-foreground">{coupon.usedCount}{coupon.maxUses ? ` / ${coupon.maxUses}` : ""}</span>
+                      </td>
+                      <td className="py-4 px-6 text-right">
+                        <span className="text-sm font-sans text-muted-foreground">
+                          {coupon.minPurchase ? `R$ ${coupon.minPurchase.toFixed(2).replace(".", ",")}` : "—"}
+                        </span>
+                      </td>
+                      <td className="py-4 px-6 text-right">
+                        <span className="text-sm font-sans text-muted-foreground flex items-center justify-end gap-1">
+                          <Calendar className="w-3 h-3" />
+                          {coupon.expiresAt ? new Date(coupon.expiresAt).toLocaleDateString("pt-BR") : "—"}
+                        </span>
+                      </td>
+                      <td className="py-4 px-6 text-center">{statusBadge(coupon)}</td>
+                      <td className="py-4 px-6 text-right">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon-sm"><span className="sr-only">Ações</span><span className="block w-1 h-1 rounded-full bg-muted-foreground" /></Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem className="gap-2 cursor-pointer" onClick={() => openEdit(coupon)}><Tag className="w-4 h-4" /> Editar</DropdownMenuItem>
+                            <DropdownMenuItem className="gap-2 cursor-pointer text-red-500" onClick={() => handleDelete(coupon.id, coupon.code)}>
+                              <Trash2 className="w-4 h-4" /> Excluir
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </motion.div>
+
+    {totalPages > 1 && (
+      <div className="flex items-center justify-between px-2">
+        <p className="text-sm font-sans text-muted-foreground">
+          Pagina {page} de {totalPages} ({total} cupons)
+        </p>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" disabled={page <= 1 || loading} onClick={() => goToPage(page - 1)} className="gap-1 font-sans">
+            <ChevronLeft className="w-4 h-4" /> Anterior
+          </Button>
+          <Button variant="outline" size="sm" disabled={!hasMore || loading} onClick={() => goToPage(page + 1)} className="gap-1 font-sans">
+            Proximo <ChevronRight className="w-4 h-4" />
+          </Button>
+        </div>
+      </div>
+    )}
     </div>
   )
 }

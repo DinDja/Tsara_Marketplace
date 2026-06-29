@@ -1,34 +1,38 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useEffect } from "react"
 import { useAsyncData } from "./useAsync"
-import { getAppointments, getAppointmentsPaginated, getOccupiedSlots, createAppointment, updateAppointmentStatus } from "@/lib/services"
+import { useFirestorePagination } from "./useFirestorePagination"
+import { getAppointments, getAppointmentsPaginated, getAppointmentsByClient, getAppointmentsByClientPaginated, getOccupiedSlots, createAppointment, updateAppointmentStatus } from "@/lib/services"
 import type { Appointment } from "@/lib/types"
-import type { PaginatedResult } from "@/lib/services/products"
 
 export function useAppointments() {
   return useAsyncData(getAppointments, [])
 }
 
 export function useAppointmentsPaginated(filters?: { status?: string; search?: string }) {
-  const [page, setPage] = useState(1)
-  const [result, setResult] = useState<PaginatedResult<Appointment>>({ data: [], total: 0, hasMore: false })
-  const [loading, setLoading] = useState(true)
-
-  const fetchPage = useCallback(async (p: number) => {
-    setLoading(true)
-    const res = await getAppointmentsPaginated(p, filters)
-    setResult(res)
-    setLoading(false)
-  }, [filters?.status, filters?.search])
+  const hook = useFirestorePagination<Appointment>(
+    (page) => getAppointmentsPaginated(page, filters),
+    { deps: [filters?.status, filters?.search] }
+  )
 
   useEffect(() => {
-    fetchPage(page)
-  }, [page, fetchPage])
+    hook.setPage(1)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters?.status, filters?.search])
 
-  const goToPage = (p: number) => setPage(p)
+  return hook
+}
 
-  return { ...result, loading, page, goToPage }
+export function useAppointmentsByClient(clientId: string, email: string) {
+  return useAsyncData(() => getAppointmentsByClient(clientId, email), [clientId, email])
+}
+
+export function useAppointmentsByClientPaginated(clientId: string, email: string, pageSize = 10) {
+  return useFirestorePagination<Appointment>(
+    (page) => getAppointmentsByClientPaginated(clientId, email, page, pageSize),
+    { deps: [clientId, email, pageSize] }
+  )
 }
 
 export function useOccupiedSlots(date: string | undefined) {

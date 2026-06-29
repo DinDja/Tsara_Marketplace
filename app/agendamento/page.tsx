@@ -337,11 +337,6 @@ function AgendamentoContent() {
                 currentStep={step}
                 title="Escolha sua consulta"
                 description="Selecione o atendimento que melhor combina com o momento que voce quer investigar."
-                footer={
-                  <Button onClick={() => continueFromStep(2)} disabled={!canContinue[1]} className="h-11 px-8 font-sans">
-                    Continuar
-                  </Button>
-                }
               >
                 {typesError ? (
                   <EmptyScheduleState title="Nao foi possivel carregar" description={typesError} />
@@ -353,7 +348,7 @@ function AgendamentoContent() {
                   <EmptyScheduleState
                     title="Nenhum tipo de consulta disponivel"
                     description="Assim que novos atendimentos forem cadastrados, eles aparecerao aqui."
-                  />
+                    />
                 ) : (
                   <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
                     {consultationTypes.map((type) => (
@@ -365,6 +360,7 @@ function AgendamentoContent() {
                           setSelectedType(type)
                           setAppliedCoupon(null)
                           setCouponCode("")
+                          setStep(2)
                         }}
                         actionLabel="Escolher consulta"
                       />

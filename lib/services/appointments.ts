@@ -184,3 +184,35 @@ export async function getAppointmentsByClient(clientId: string, email: string): 
 export async function deleteAppointment(id: string): Promise<void> {
   await deleteDoc(doc(db, FIRESTORE_COLLECTIONS.appointments, id))
 }
+
+export async function getAppointmentsByClientPaginated(
+  clientId: string,
+  _email: string,
+  page: number,
+  pageSize = 10
+): Promise<PaginatedResult<Appointment>> {
+  try {
+    const countConstraints: any[] = [where("clientId", "==", clientId)]
+    const countSnap = await getCountFromServer(query(col, ...countConstraints))
+    const total = countSnap.data().count
+
+    const dataConstraints: any[] = [where("clientId", "==", clientId), orderBy("date", "desc"), orderBy("time", "desc")]
+
+    if (page > 1) {
+      const prevQ = query(col, ...dataConstraints, limit((page - 1) * pageSize))
+      const prevSnap = await getDocs(prevQ)
+      if (prevSnap.docs.length > 0) {
+        dataConstraints.push(startAfter(prevSnap.docs[prevSnap.docs.length - 1]))
+      }
+    }
+
+    dataConstraints.push(limit(pageSize))
+    const snap = await getDocs(query(col, ...dataConstraints))
+    const docs = snap.docs.map(mapDoc)
+    const totalPages = Math.ceil(total / pageSize)
+
+    return { data: docs, total, hasMore: page < totalPages }
+  } catch {
+    return { data: [], total: 0, hasMore: false }
+  }
+}
