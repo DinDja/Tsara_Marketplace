@@ -202,3 +202,60 @@ export type AsyncState<T> = {
   loading: boolean
   error: Error | null
 }
+
+export type ChatMessageType = "text" | "image" | "audio"
+
+export type ChatMessageStatus = "sending" | "sent" | "delivered" | "read"
+
+export interface ChatMessage {
+  id: string
+  chatId: string
+  senderId: string
+  senderName: string
+  senderRole: "admin" | "client"
+  type: ChatMessageType
+  text?: string
+  /** Imagem em base64 (data URL) quando type === "image" */
+  image?: string
+  /** Mime type da imagem (ex: image/jpeg) */
+  imageMime?: string
+  /** Áudio em base64 (data URL) quando type === "audio" */
+  audio?: string
+  /** Mime type do áudio (ex: audio/webm) */
+  audioMime?: string
+  /** Duração do áudio em segundos (opcional) */
+  audioDuration?: number
+  status: ChatMessageStatus
+  /** Se a mensagem foi deletada */
+  deleted?: boolean
+  createdAt: Date
+}
+
+export interface Chat {
+  id: string
+  /** ID do usuário cliente */
+  clientId: string
+  clientName: string
+  clientEmail: string
+  clientAvatar?: string
+  /** ID do admin responsável (preenchido quando admin responde) */
+  adminId?: string
+  adminName?: string
+  /** Referência ao agendamento que originou o chat (opcional) */
+  appointmentId?: string
+  appointmentType?: string
+  appointmentDate?: string
+  /** Última mensagem (preview) */
+  lastMessage?: string
+  lastMessageType?: ChatMessageType
+  lastMessageAt?: Date
+  /** Contadores de mensagens não lidas */
+  unreadByClient: number
+  unreadByAdmin: number
+  /** Se o chat está arquivado */
+  archived?: boolean
+  /** Data em que foi arquivado */
+  archivedAt?: Date
+  createdAt: Date
+  updatedAt: Date
+}

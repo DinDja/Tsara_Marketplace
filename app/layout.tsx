@@ -4,6 +4,7 @@ import { Analytics } from '@vercel/analytics/next'
 import './globals.css'
 import { Providers } from './providers'
 import { PwaRegister } from '@/components/pwa-register'
+import { ChatFloatButton } from '@/components/chat-float-button'
 
 const cormorant = Cormorant_Garamond({ 
   subsets: ["latin"],
@@ -48,6 +49,7 @@ export default function RootLayout({
       <body className={`${cormorant.variable} ${inter.variable} font-serif antialiased`}>
         <Providers>
           {children}
+          <ChatFloatButton />
           <PwaRegister />
         </Providers>
         {process.env.NODE_ENV === 'production' && <Analytics />}

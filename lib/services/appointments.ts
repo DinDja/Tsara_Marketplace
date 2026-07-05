@@ -1,6 +1,5 @@
 import {
   collection, getDocs, getDoc, doc, addDoc, updateDoc, deleteDoc, query, where, Timestamp,
-  limit, orderBy, startAfter, getCountFromServer,
   runTransaction,
 } from "firebase/firestore"
 import { db, FIRESTORE_COLLECTIONS } from "@/lib/firebase/config"
@@ -58,34 +57,36 @@ export async function getAppointmentsPaginated(
   filters?: { status?: string; search?: string }
 ): Promise<PaginatedResult<Appointment>> {
   try {
-    const countConstraints: any[] = []
-    if (filters?.status && filters.status !== "all") {
-      countConstraints.push(where("status", "==", filters.status))
-    }
-    const countSnap = await getCountFromServer(query(col, ...countConstraints))
-    const total = countSnap.data().count
+    // Busca todos os documentos e faz ordenação/paginação no cliente
+    // para evitar necessidade de índices compostos no Firestore
+    const snap = await getDocs(col)
+    let all = snap.docs.map(mapDoc)
 
+    // Aplica filtro de status
+    if (filters?.status && filters.status !== "all") {
+      all = all.filter((a) => a.status === filters.status)
+    }
+
+    // Aplica filtro de busca (nome do cliente)
+    if (filters?.search) {
+      const term = filters.search.toLowerCase()
+      all = all.filter((a) => a.client.toLowerCase().includes(term))
+    }
+
+    // Ordena por data decrescente e horário decrescente
+    all.sort((a, b) => {
+      const da = new Date(`${a.date}T${a.time}`).getTime()
+      const db = new Date(`${b.date}T${b.time}`).getTime()
+      return db - da
+    })
+
+    const total = all.length
     const pageSize = 20
-
-    const dataConstraints: any[] = [orderBy("date", "desc"), orderBy("time", "desc")]
-    if (filters?.status && filters.status !== "all") {
-      dataConstraints.push(where("status", "==", filters.status))
-    }
-
-    if (page > 1) {
-      const prevQ = query(col, ...dataConstraints, limit((page - 1) * pageSize))
-      const prevSnap = await getDocs(prevQ)
-      if (prevSnap.docs.length > 0) {
-        dataConstraints.push(startAfter(prevSnap.docs[prevSnap.docs.length - 1]))
-      }
-    }
-
-    dataConstraints.push(limit(pageSize))
-    const snap = await getDocs(query(col, ...dataConstraints))
-    const docs = snap.docs.map(mapDoc)
+    const start = (page - 1) * pageSize
+    const data = all.slice(start, start + pageSize)
     const totalPages = Math.ceil(total / pageSize)
 
-    return { data: docs, total, hasMore: page < totalPages }
+    return { data, total, hasMore: page < totalPages }
   } catch {
     return { data: [], total: 0, hasMore: false }
   }
@@ -187,31 +188,20 @@ export async function deleteAppointment(id: string): Promise<void> {
 
 export async function getAppointmentsByClientPaginated(
   clientId: string,
-  _email: string,
+  email: string,
   page: number,
   pageSize = 10
 ): Promise<PaginatedResult<Appointment>> {
   try {
-    const countConstraints: any[] = [where("clientId", "==", clientId)]
-    const countSnap = await getCountFromServer(query(col, ...countConstraints))
-    const total = countSnap.data().count
+    // Reaproveita a função não-paginada que já busca por clientId e email
+    const all = await getAppointmentsByClient(clientId, email)
 
-    const dataConstraints: any[] = [where("clientId", "==", clientId), orderBy("date", "desc"), orderBy("time", "desc")]
-
-    if (page > 1) {
-      const prevQ = query(col, ...dataConstraints, limit((page - 1) * pageSize))
-      const prevSnap = await getDocs(prevQ)
-      if (prevSnap.docs.length > 0) {
-        dataConstraints.push(startAfter(prevSnap.docs[prevSnap.docs.length - 1]))
-      }
-    }
-
-    dataConstraints.push(limit(pageSize))
-    const snap = await getDocs(query(col, ...dataConstraints))
-    const docs = snap.docs.map(mapDoc)
+    const total = all.length
+    const start = (page - 1) * pageSize
+    const data = all.slice(start, start + pageSize)
     const totalPages = Math.ceil(total / pageSize)
 
-    return { data: docs, total, hasMore: page < totalPages }
+    return { data, total, hasMore: page < totalPages }
   } catch {
     return { data: [], total: 0, hasMore: false }
   }

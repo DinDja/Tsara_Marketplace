@@ -93,3 +93,23 @@ export async function getCurrentUser(): Promise<User | null> {
 export async function resetPassword(email: string): Promise<void> {
   await sendPasswordResetEmail(auth, email)
 }
+
+/**
+ * Comprime uma imagem (File) e salva como base64 no perfil do usuário no Firestore.
+ * Retorna a string base64 comprimida.
+ */
+export async function updateAvatar(uid: string, file: File): Promise<string> {
+  // Reutiliza a compressImage do lib/image.ts
+  const { encodeImage } = await import("@/lib/image")
+  const base64 = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(reader.result as string)
+    reader.onerror = reject
+    reader.readAsDataURL(file)
+  })
+  const compressed = await encodeImage(base64)
+  // encodeImage pode retornar string ou { _chunks }. Garantimos string.
+  const avatar = typeof compressed === "string" ? compressed : compressed._chunks?.join("") ?? base64
+  await setDoc(doc(db, FIRESTORE_COLLECTIONS.users, uid), { avatar, updatedAt: Timestamp.now() }, { merge: true })
+  return avatar
+}

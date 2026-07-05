@@ -49,12 +49,12 @@ export function Hero() {
           transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
           className="relative "
         >
-          <Lottie
+          {/* <Lottie
             animationData={moonAnimation}
             loop
             autoplay
             className="w-full h-full object-contain opacity-80 drop-shadow-[0_0_30px_rgba(212,175,55,0.3)]"
-          />
+          /> */}
         </motion.div>
       </div>
 

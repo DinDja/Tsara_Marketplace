@@ -24,4 +24,6 @@ export const FIRESTORE_COLLECTIONS = {
   users: "users",
   coupons: "coupons",
   reviews: "reviews",
+  chats: "chats",
+  chatMessages: "messages",
 } as const

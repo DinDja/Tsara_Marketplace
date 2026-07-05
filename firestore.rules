@@ -175,6 +175,46 @@ service cloud.firestore {
     }
 
     // ==========================================
+    // CHAT - conversas entre cliente e admin
+    // ==========================================
+
+    match /chats/{chatId} {
+      // Admin vê todos os chats; cliente vê apenas o próprio
+      allow read: if isAdmin()
+        || (isAuthenticated() && resource.data.clientId == request.auth.uid);
+
+      // Cliente pode criar seu chat (apenas 1); admin também pode criar
+      allow create: if isAuthenticated()
+        && (isAdmin() || request.resource.data.clientId == request.auth.uid);
+
+      // Admin pode atualizar qualquer chat; cliente só atualiza o próprio
+      allow update: if isAdmin()
+        || (isAuthenticated() && resource.data.clientId == request.auth.uid);
+
+      allow delete: if isAdmin();
+
+      // ==========================================
+      // MENSAGENS DO CHAT
+      // ==========================================
+      match /messages/{messageId} {
+        // Participantes do chat podem ler mensagens
+        allow read: if isAdmin()
+          || (isAuthenticated()
+              && get(/databases/$(database)/documents/chats/$(chatId)).data.clientId == request.auth.uid);
+
+        // Participantes podem enviar mensagens
+        allow create: if isAuthenticated()
+          && (isAdmin()
+              || get(/databases/$(database)/documents/chats/$(chatId)).data.clientId == request.auth.uid)
+          && request.resource.data.senderId == request.auth.uid
+          && request.resource.data.type in ['text', 'image', 'audio'];
+
+        // Apenas admin pode atualizar/deletar mensagens (moderação)
+        allow update, delete: if isAdmin();
+      }
+    }
+
+    // ==========================================
     // NEGAÇÃO PADRÃO
     // ==========================================
 

@@ -1,13 +1,13 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import {
   ArrowLeft, User, Mail, Phone, Save, LogOut, Shield,
-  MapPin, Plus, Trash2, Home, Lock, KeyRound,
-  AlertCircle, CheckCircle2, Loader2,
+  MapPin, Plus, Trash2, Home, Lock, KeyRound, Camera,
+  AlertCircle, CheckCircle2, Loader2, MessageCircle,
 } from "lucide-react"
 import { MoonIcon } from "@/components/moon-icon"
 import { Button } from "@/components/ui/button"
@@ -33,7 +33,7 @@ import { toast } from "sonner"
 import type { UserAddress } from "@/lib/types"
 
 export default function ContaPage() {
-  const { user, logout, loading } = useAuth()
+  const { user, logout, loading, updateAvatar } = useAuth()
   const router = useRouter()
   const [name, setName] = useState("")
   const [phone, setPhone] = useState("")
@@ -41,6 +41,8 @@ export default function ContaPage() {
   const [addresses, setAddresses] = useState<UserAddress[]>([])
   const [loadingAddr, setLoadingAddr] = useState(true)
   const [tab, setTab] = useState("dados")
+  const [uploadingAvatar, setUploadingAvatar] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (!loading && !user) { router.push("/login"); return }
@@ -66,6 +68,29 @@ export default function ContaPage() {
     await logout()
     toast.success("Você saiu da sua conta.")
     router.push("/")
+  }
+
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("A imagem deve ter no máximo 5MB")
+      return
+    }
+    if (!file.type.startsWith("image/")) {
+      toast.error("Selecione uma imagem válida")
+      return
+    }
+    setUploadingAvatar(true)
+    try {
+      await updateAvatar(file)
+      toast.success("Foto atualizada com sucesso!")
+    } catch {
+      toast.error("Erro ao atualizar foto")
+    } finally {
+      setUploadingAvatar(false)
+      if (fileInputRef.current) fileInputRef.current.value = ""
+    }
   }
 
   if (loading) return <LoadingSkeleton />
@@ -106,10 +131,26 @@ export default function ContaPage() {
               <Card className="bg-card border-border overflow-hidden">
                 <div className="h-16 bg-gradient-to-r from-primary/20 to-primary/5" />
                 <CardContent className="p-6 -mt-10 text-center">
-                  <Avatar className="w-20 h-20 mx-auto border-4 border-background shadow-md">
-                    <AvatarImage src={user.avatar} alt={user.name} />
-                    <AvatarFallback className="text-xl font-bold text-gold bg-gold/20">{initials}</AvatarFallback>
-                  </Avatar>
+                  <div className="relative group cursor-pointer" onClick={() => fileInputRef.current?.click()}>
+                    <Avatar className="w-20 h-20 mx-auto border-4 border-background shadow-md">
+                      <AvatarImage src={user.avatar} alt={user.name} />
+                      <AvatarFallback className="text-xl font-bold text-gold bg-gold/20">{initials}</AvatarFallback>
+                    </Avatar>
+                    <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity">
+                      {uploadingAvatar ? (
+                        <Loader2 className="w-6 h-6 text-white animate-spin" />
+                      ) : (
+                        <Camera className="w-6 h-6 text-white" />
+                      )}
+                    </div>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handleAvatarChange}
+                    />
+                  </div>
                   <h2 className="text-lg font-semibold text-foreground mt-3">{user.name}</h2>
                   <p className="text-sm font-sans text-muted-foreground truncate">{user.email}</p>
                   <div className="mt-3 inline-flex items-center gap-1 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-sans font-medium">
@@ -141,6 +182,9 @@ export default function ContaPage() {
               </nav>
 
               <div className="space-y-2 pt-2">
+                <Button asChild variant="outline" className="w-full justify-start gap-2 font-sans">
+                  <Link href="/chat"><MessageCircle className="w-4 h-4" /> Suporte / Chat</Link>
+                </Button>
                 {user.role === "admin" && (
                   <Button asChild variant="outline" className="w-full justify-start gap-2 font-sans">
                     <Link href="/admin"><Shield className="w-4 h-4" /> Painel Admin</Link>

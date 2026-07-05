@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from "react"
 import type { User } from "@/lib/types"
-import { loginWithEmail, registerUser, loginWithGoogle, logout as logoutService, getCurrentUser } from "@/lib/services"
+import { loginWithEmail, registerUser, loginWithGoogle, logout as logoutService, getCurrentUser, updateAvatar as updateAvatarService } from "@/lib/services"
 
 interface AuthContextType {
   user: User | null
@@ -11,6 +11,7 @@ interface AuthContextType {
   register: (name: string, email: string, password: string) => Promise<void>
   loginGoogle: () => Promise<void>
   logout: () => Promise<void>
+  updateAvatar: (file: File) => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | null>(null)
@@ -45,8 +46,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null)
   }, [])
 
+  const updateAvatar = useCallback(async (file: File) => {
+    if (!user) return
+    const avatar = await updateAvatarService(user.id, file)
+    setUser(prev => prev ? { ...prev, avatar } : null)
+  }, [user])
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, loginGoogle, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, register, loginGoogle, logout, updateAvatar }}>
       {children}
     </AuthContext.Provider>
   )
