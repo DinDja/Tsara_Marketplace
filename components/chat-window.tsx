@@ -178,25 +178,27 @@ export function ChatWindow({
     return <div className="flex-1 flex items-center justify-center p-8 text-muted-foreground">{emptyState ?? "Selecione uma conversa"}</div>
   }
 
+  // Layout flex puro: ocupa toda a altura do container pai (fullscreen ou não).
+  // O pai é responsável por definir a altura; aqui só garantimos flex-1/min-h-0.
   return (
-    <div className="flex flex-col h-full">
-      {/* Cabeçalho */}
+    <div className="flex flex-col h-full w-full min-h-0">
+      {/* Cabeçalho (quando não ocultado pela página) */}
       {!hideHeader && (
-        <div className="flex items-center gap-3 p-4 border-b bg-gradient-to-r from-gold/5 to-transparent">
+        <div className="flex items-center gap-3 p-2 sm:p-4 border-b bg-gradient-to-r from-gold/5 to-transparent flex-shrink-0">
           <div className="relative">
-            <Avatar className="h-12 w-12 ring-2 ring-background">
+            <Avatar className="h-9 w-9 sm:h-12 sm:w-12 ring-2 ring-background">
               {peerAvatar ? <AvatarImage src={peerAvatar} alt={peerName} /> : null}
               <AvatarFallback className="bg-gold/20 text-gold font-semibold">
                 {peerName?.slice(0, 2).toUpperCase()}
               </AvatarFallback>
             </Avatar>
-            <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-background" />
+            <div className="absolute -bottom-0.5 -right-0.5 sm:-bottom-1 sm:-right-1 w-2.5 h-2.5 sm:w-4 sm:h-4 bg-green-500 rounded-full border-2 border-background" />
           </div>
-          <div className="min-w-0">
-            <p className="font-medium truncate text-base">{peerName}</p>
+          <div className="min-w-0 flex-1">
+            <p className="font-medium truncate text-sm sm:text-base">{peerName}</p>
             {peerSubtitle ? (
               <p className="text-xs text-muted-foreground truncate flex items-center gap-1">
-                <span className="w-1 h-1 bg-green-500 rounded-full"></span>
+                <span className="w-1 h-1 bg-green-500 rounded-full flex-shrink-0"></span>
                 {peerSubtitle}
               </p>
             ) : null}
@@ -204,8 +206,11 @@ export function ChatWindow({
         </div>
       )}
 
-      {/* Mensagens - estilo WhatsApp com papél de parede sutil */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto px-3 sm:px-4 py-3 space-y-1.5 wa-chat-bg">
+      {/* Mensagens - flex-1 preenche tudo que sobra do pai */}
+      <div
+        ref={scrollRef}
+        className="flex-1 min-h-0 overflow-y-auto px-2 sm:px-4 py-2 sm:py-3 space-y-1.5 wa-chat-bg"
+      >
         {loading ? (
           <div className="flex items-center justify-center h-full">
             <div className="text-center">
@@ -243,14 +248,15 @@ export function ChatWindow({
         )}
       </div>
 
-      {/* Preview de imagem */}
+      {/* Preview de imagem (inline, acima do composer) */}
       {imagePreview && (
-        <div className="p-2 border-t bg-background relative">
+        <div className="p-2 border-t bg-background relative flex-shrink-0">
           <div className="relative inline-block">
-            <img src={imagePreview} alt="preview" className="h-24 w-24 object-cover rounded-lg" />
+            <img src={imagePreview} alt="preview" className="h-20 w-20 sm:h-24 sm:w-24 object-cover rounded-lg" />
             <button
               onClick={() => { setImageData(null); setImagePreview(null); setImageMime(null) }}
               className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full p-1"
+              aria-label="Remover imagem"
             >
               <X className="h-3 w-3" />
             </button>
@@ -258,30 +264,15 @@ export function ChatWindow({
         </div>
       )}
 
-      {/* Composer */}
-      <div className="p-4 border-t bg-background/95 backdrop-blur border-gold/20">
-        {/* Preview de imagem */}
-        {imagePreview && (
-          <div className="mb-3 p-3 bg-gold/5 rounded-lg border border-gold/20 relative">
-            <div className="relative inline-block">
-              <img src={imagePreview} alt="preview" className="h-20 w-20 object-cover rounded-lg" />
-              <button
-                onClick={() => { setImageData(null); setImagePreview(null); setImageMime(null) }}
-                className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full p-1.5 hover:bg-destructive/80 transition-colors"
-              >
-                <X className="h-3 w-3" />
-              </button>
-            </div>
-            <p className="text-xs text-muted-foreground mt-2">Clique para remover</p>
-          </div>
-        )}
+      {/* Composer - mobile first: altura confortável p/ toque */}
+      <div className="p-2 sm:p-3 border-t bg-background/95 backdrop-blur border-gold/20 flex-shrink-0">
 
         {/* Preview de áudio */}
         {audioData && !recording && (
-          <div className="mb-3 p-3 bg-gold/5 rounded-lg border border-gold/20">
+          <div className="mb-2 sm:mb-3 p-2 sm:p-3 bg-gold/5 rounded-lg border border-gold/20">
             <div className="flex items-center gap-2">
               <AudioMessage url={audioData} />
-              <Button size="sm" variant="ghost" onClick={() => { setAudioData(null); setAudioMime(null) }} className="text-destructive hover:text-destructive">
+              <Button size="sm" variant="ghost" onClick={() => { setAudioData(null); setAudioMime(null) }} className="text-destructive hover:text-destructive h-6 sm:h-auto">
                 <X className="h-4 w-4" /> Remover
               </Button>
             </div>
@@ -290,7 +281,7 @@ export function ChatWindow({
 
         {/* Indicador de gravação */}
         {recording && (
-          <div className="mb-3 p-3 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800 flex items-center gap-2">
+          <div className="mb-2 sm:mb-3 p-2 sm:p-3 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800 flex items-center gap-2">
             <div className="w-3 h-3 rounded-full bg-red-500 animate-pulse" />
             <span className="text-sm font-medium text-red-600 dark:text-red-400">
               Gravando... {Math.floor(recordSeconds / 60)}:{String(recordSeconds % 60).padStart(2, "0")}
@@ -299,15 +290,15 @@ export function ChatWindow({
               size="sm" 
               variant="destructive" 
               onClick={stopRecording} 
-              className="ml-auto"
+              className="ml-auto h-6 sm:h-auto"
             >
               <X className="h-4 w-4 mr-1" /> Parar
             </Button>
           </div>
         )}
 
-        {/* Input de mensagem */}
-        <div className="flex items-center gap-2">
+        {/* Input de mensagem - mobile first: alvo de toque grande (44px+) */}
+        <div className="flex items-center gap-1 sm:gap-2">
           <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleImagePick} />
           <Button
             variant="ghost"
@@ -315,9 +306,10 @@ export function ChatWindow({
             onClick={() => fileInputRef.current?.click()}
             disabled={recording || sending}
             title="Enviar imagem"
-            className="h-10 w-10 hover:bg-gold/20 transition-colors"
+            aria-label="Enviar imagem"
+            className="h-10 w-10 sm:h-11 sm:w-11 shrink-0 hover:bg-gold/20 transition-colors"
           >
-            <ImageIcon className="h-5 w-5" />
+            <ImageIcon className="h-5 w-5 sm:h-5 sm:w-5" />
           </Button>
           <Button
             variant="ghost"
@@ -325,14 +317,15 @@ export function ChatWindow({
             onClick={recording ? stopRecording : startRecording}
             disabled={sending || !!imageData}
             title={recording ? "Parar gravação" : "Gravar áudio"}
+            aria-label={recording ? "Parar gravação" : "Gravar áudio"}
             className={cn(
-              "h-10 w-10 transition-colors",
+              "h-10 w-10 sm:h-11 sm:w-11 shrink-0 transition-colors",
               recording ? "text-red-500 bg-red-50 hover:bg-red-100" : "hover:bg-gold/20"
             )}
           >
             <Mic className="h-5 w-5" />
           </Button>
-          <div className="flex-1 relative">
+          <div className="flex-1 min-w-0 relative">
             <Input
               value={text}
               onChange={(e) => setText(e.target.value)}
@@ -344,21 +337,21 @@ export function ChatWindow({
               }}
               placeholder="Digite sua mensagem..."
               disabled={recording || sending || !!imageData || !!audioData}
-              className="pr-12"
+              className="h-11 sm:h-11 pr-14 sm:pr-16 text-base sm:text-sm"
+              maxLength={500}
             />
-            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
-              {text.length > 0 && (
-                <span className="text-xs text-muted-foreground">
-                  {text.length}/500
-                </span>
-              )}
-            </div>
+            {text.length > 0 && (
+              <span className="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 text-[10px] sm:text-xs text-muted-foreground tabular-nums pointer-events-none">
+                {text.length}/500
+              </span>
+            )}
           </div>
           <Button 
             onClick={handleSend} 
             disabled={sending || recording || (!text.trim() && !imageData && !audioData)}
             size="icon"
-            className="h-10 w-10 bg-gradient-to-r from-gold to-gold/90 hover:from-gold hover:to-gold text-black shadow-lg hover:shadow-xl transition-all duration-300"
+            aria-label="Enviar mensagem"
+            className="h-11 w-11 shrink-0 bg-gradient-to-r from-gold to-gold/90 hover:from-gold hover:to-gold text-black shadow-lg hover:shadow-xl transition-all duration-300"
           >
             {sending ? (
               <Loader2 className="h-5 w-5 animate-spin" />

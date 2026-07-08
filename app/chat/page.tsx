@@ -44,7 +44,7 @@ export default function ChatPage() {
 
   if (authLoading || loading) {
     return (
-      <div className="min-h-[60vh] flex items-center justify-center">
+      <div className="h-[100dvh] flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
       </div>
     )

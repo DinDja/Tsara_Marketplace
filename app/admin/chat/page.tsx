@@ -120,17 +120,19 @@ export default function AdminChatPage() {
   </Dialog>
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold flex items-center gap-2">
-          <MessageCircle className="h-6 w-6" /> Mensagens
+    <div className="flex flex-col h-[100dvh] min-h-0">
+      {/* Header com título (compacto no mobile) */}
+      <div className="p-3 sm:p-4 flex-shrink-0">
+        <h1 className="text-xl sm:text-2xl font-semibold flex items-center gap-2">
+          <MessageCircle className="h-5 w-5 sm:h-6 sm:w-6" /> Mensagens
         </h1>
-        <p className="text-sm text-muted-foreground">Conversas com clientes em tempo real</p>
+        <p className="text-xs sm:text-sm text-muted-foreground">Conversas com clientes em tempo real</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 h-[72vh] min-h-[480px]">
+      {/* Layout principal — fullscreen no mobile, grid no desktop */}
+      <div className="flex-1 min-h-0 grid grid-cols-1 md:grid-cols-3 gap-0 md:gap-4 px-0 md:px-4 pb-0 md:pb-4">
         {/* Lista de conversas */}
-        <div className={cn("border rounded-lg flex flex-col", selectedId ? "hidden md:flex" : "flex")}>
+        <div className={cn("flex flex-col min-h-0", "md:border md:rounded-lg", selectedId ? "hidden md:flex" : "flex")}>
           <div className="p-3 border-b">
             <div className="relative">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -214,23 +216,26 @@ export default function AdminChatPage() {
         </div>
 
         {/* Janela de conversa */}
-        <div className={cn("md:col-span-2 border rounded-lg overflow-hidden flex flex-col", selectedId ? "flex" : "hidden md:flex")}>
+        <div className={cn("flex flex-col min-h-0 md:col-span-2 md:border md:rounded-lg", selectedId ? "flex" : "hidden md:flex")}>
           {selectedId && selected ? (
-            <div className="flex flex-col h-full">
-              <div className="md:hidden p-2 border-b">
-                <Button variant="ghost" size="sm" onClick={() => setSelectedId(null)}>
-                  <ArrowLeft className="h-4 w-4 mr-1" /> Voltar
+            <div className="flex flex-col flex-1 min-h-0">
+              <div className="flex items-center gap-2 p-2 md:hidden border-b flex-shrink-0">
+                <Button variant="ghost" size="icon" onClick={() => setSelectedId(null)} aria-label="Voltar" className="h-10 w-10">
+                  <ArrowLeft className="h-5 w-5" />
                 </Button>
+                <span className="font-semibold text-sm truncate">{selected.clientName}</span>
               </div>
-              <ChatWindow
-                chatId={selectedId}
-                role="admin"
-                senderId={user?.id ?? "admin"}
-                senderName={user?.name ?? "Admin"}
-                peerName={selected.clientName}
-                peerAvatar={selected.clientAvatar}
-                peerSubtitle={selected.clientEmail}
-              />
+              <div className="flex-1 min-h-0">
+                <ChatWindow
+                  chatId={selectedId}
+                  role="admin"
+                  senderId={user?.id ?? "admin"}
+                  senderName={user?.name ?? "Admin"}
+                  peerName={selected.clientName}
+                  peerAvatar={selected.clientAvatar}
+                  peerSubtitle={selected.clientEmail}
+                />
+              </div>
             </div>
           ) : (
             <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm p-6 text-center">

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { usePathname } from "next/navigation"
-import { MessageSquare, X, MessageCircle, Trash2, MoreVertical } from "lucide-react"
+import { X, MessageCircle, Trash2, MoreVertical } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
@@ -13,7 +13,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog"
 import { cn } from "@/lib/utils"
 import { ChatWindow } from "./chat-window"
@@ -33,12 +32,6 @@ interface ChatFloatButtonProps {
 
 export function ChatFloatButton({ className }: ChatFloatButtonProps) {
   const pathname = usePathname()
-  
-  // Não mostrar na página de admin
-  if (pathname === '/admin/chat') {
-    return null
-  }
-  
   const [isOpen, setIsOpen] = useState(false)
   const [selectedChat, setSelectedChat] = useState<string | null>(null)
   const [selectedChatData, setSelectedChatData] = useState<Chat | null>(null)
@@ -48,19 +41,16 @@ export function ChatFloatButton({ className }: ChatFloatButtonProps) {
   const [showDeleteChatDialog, setShowDeleteChatDialog] = useState(false)
   const [chatToDelete, setChatToDelete] = useState<string | null>(null)
   
-  // Carregar chats para administradores
+  // Carregar chats para administradores (hook sempre chamado na mesma ordem)
   useEffect(() => {
     if (!user || user.role !== "admin") return
     
     const unsubscribe = subscribeChats((chats) => {
       setChats(chats)
-      
-      // Verificar se há novas mensagens não lidas
       const hasUnread = chats.some(chat => chat.unreadByAdmin > 0)
       setHasNewMessages(hasUnread)
     })
     
-    // Carregar chats iniciais
     listChats().then(chats => {
       setChats(chats)
       const hasUnread = chats.some(chat => chat.unreadByAdmin > 0)
@@ -69,6 +59,10 @@ export function ChatFloatButton({ className }: ChatFloatButtonProps) {
     
     return unsubscribe
   }, [user])
+
+  // Early return DEPOIS de todos os hooks
+  const hideButton = pathname === '/admin/chat'
+  if (hideButton || !user) return null
 
   const handleDeleteChat = async (chatId: string) => {
     try {
@@ -86,29 +80,25 @@ export function ChatFloatButton({ className }: ChatFloatButtonProps) {
     }
   }
 
-  if (!user) return null
-
   return (
     <>
       {/* Botão flutuante com indicador de novas mensagens */}
-      <div className="fixed bottom-6 right-6 z-50">
+      <div className="fixed bottom-4 right-4 z-50 sm:bottom-6 sm:right-6">
         <Button
           onClick={() => setIsOpen(!isOpen)}
           size="icon"
           className={cn(
             "relative rounded-full shadow-xl hover:shadow-2xl transition-all duration-500",
             "bg-gradient-to-br from-gold to-gold/80 text-black border-2 border-gold/30",
-            "w-14 h-14 md:w-16 md:h-16 hover:scale-105 active:scale-95",
+            "w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 hover:scale-105 active:scale-95",
             "group",
             className
           )}
+          aria-label={isOpen ? "Fechar suporte" : "Abrir suporte"}
         >
-          {/* Animação pulsante quando há novas mensagens */}
           {hasNewMessages && (
             <div className="absolute inset-0 rounded-full bg-gold animate-ping opacity-30" />
           )}
-          
-          {/* Ícone principal */}
           <div className="relative z-10">
             {isOpen ? (
               <X className="h-6 w-6 transition-transform duration-300 group-hover:rotate-90" />
@@ -116,34 +106,33 @@ export function ChatFloatButton({ className }: ChatFloatButtonProps) {
               <MessageCircle className="h-6 w-6 transition-transform duration-300" />
             )}
           </div>
-          
-          {/* Indicador de notificação */}
           {hasNewMessages && (
             <div className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full border-2 border-background animate-bounce z-20" />
           )}
         </Button>
       </div>
 
-      {/* Painel de chat com animação suave */}
+      {/* Painel de chat — mobile: fullscreen; >=sm: card flutuante */}
       <div
         className={cn(
-          "fixed bottom-24 right-6 z-40 w-80 md:w-96 h-96 md:h-[500px]",
-          "bg-background/95 backdrop-blur-xl border border-gold/20 rounded-2xl",
-          "shadow-2xl transition-all duration-500 ease-out",
+          "fixed z-40 bg-background transition-all duration-500 ease-out",
+          "left-0 right-0 bottom-0 top-0 sm:inset-auto sm:top-auto sm:left-auto",
+          "sm:bottom-20 sm:right-2 sm:w-96 sm:h-[80vh] sm:max-h-[600px]",
+          "sm:rounded-2xl sm:border sm:border-gold/20 sm:shadow-2xl",
           isOpen
             ? "opacity-100 translate-y-0"
             : "opacity-0 translate-y-4 pointer-events-none"
         )}
       >
         {/* Cabeçalho com fundo mais elegante */}
-        <div className="flex items-center justify-between p-4 border-b bg-gradient-to-r from-gold/10 to-transparent">
-          <div className="flex items-center gap-2">
-            <div className="w-2 h-2 bg-gold rounded-full animate-pulse" />
-            <h3 className="font-semibold text-lg text-foreground">
+        <div className="flex items-center justify-between p-3 sm:p-4 border-b bg-gradient-to-r from-gold/10 to-transparent">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="w-2 h-2 bg-gold rounded-full animate-pulse flex-shrink-0" />
+            <h3 className="font-semibold text-base sm:text-lg text-foreground truncate">
               {user.role === "admin" ? "Conversas" : "Suporte Tsara"}
             </h3>
             {hasNewMessages && user.role === "admin" && (
-              <Badge variant="secondary" className="text-xs bg-gold/20 text-gold">
+              <Badge variant="secondary" className="text-xs bg-gold/20 text-gold shrink-0">
                 {chats.reduce((total, chat) => total + (chat.unreadByAdmin || 0), 0)} novas
               </Badge>
             )}
@@ -152,14 +141,15 @@ export function ChatFloatButton({ className }: ChatFloatButtonProps) {
             variant="ghost"
             size="icon"
             onClick={() => setIsOpen(false)}
-            className="h-8 w-8 hover:bg-gold/20 transition-colors"
+            aria-label="Fechar"
+            className="h-10 w-10 shrink-0 hover:bg-gold/20 transition-colors"
           >
-            <X className="h-4 w-4" />
+            <X className="h-5 w-5" />
           </Button>
         </div>
 
-        {/* Conteúdo */}
-        <div className="flex-1 overflow-hidden flex flex-col">
+        {/* Conteúdo — flex-1 p/ preencher tudo no mobile fullscreen */}
+        <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
           {user.role === "admin" ? (
             <AdminChatList 
               chats={chats} 
@@ -181,6 +171,8 @@ export function ChatFloatButton({ className }: ChatFloatButtonProps) {
             />
           )}
         </div>
+
+      </div>
 
       {/* Dialog de confirmação para excluir chat */}
       <Dialog open={showDeleteChatDialog} onOpenChange={setShowDeleteChatDialog}>
@@ -211,42 +203,45 @@ export function ChatFloatButton({ className }: ChatFloatButtonProps) {
         </DialogContent>
       </Dialog>
 
-      {/* Window de chat se selecionado */}
+      {/* Window de chat se selecionado — fullscreen em qualquer tela */}
       {selectedChat && (
-          <div className="fixed inset-0 z-50 bg-background/95 backdrop-blur-sm">
-            <div className="h-full flex flex-col">
-              <div className="flex items-center justify-between p-4 border-b bg-gradient-to-r from-gold/5 to-transparent">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setSelectedChat(null)}
-                  className="h-8 w-8 hover:bg-gold/20 transition-colors"
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-                <span className="font-semibold">Conversa</span>
-                <div className="w-8" />
-              </div>
-              <ChatWindow
-                chatId={selectedChat}
-                role={user.role === "admin" ? "admin" : "client"}
-                senderId={user.id}
-                senderName={user.name}
-                peerName={user.role === "admin" ? selectedChatData?.clientName || "Cliente" : "Suporte Tsara"}
-                peerSubtitle={user.role === "admin" ? selectedChatData?.clientEmail : "Equipe de atendimento"}
-                emptyState={
-                  <div className="flex-1 flex items-center justify-center text-muted-foreground">
-                    <div className="text-center">
-                      <MessageCircle className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                      <p>Selecione uma conversa para começar</p>
-                    </div>
+        <div className="fixed inset-0 z-50 bg-background flex flex-col">
+          <header className="flex items-center gap-2 p-2 sm:p-3 border-b bg-gradient-to-r from-gold/5 to-transparent flex-shrink-0">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setSelectedChat(null)}
+              aria-label="Voltar"
+              className="h-10 w-10 shrink-0 hover:bg-gold/20 transition-colors"
+            >
+              <X className="h-5 w-5" />
+            </Button>
+            <span className="font-semibold text-sm sm:text-base truncate">
+              {user.role === "admin" ? (selectedChatData?.clientName || "Cliente") : "Suporte Tsara"}
+            </span>
+          </header>
+          <div className="flex-1 min-h-0">
+            <ChatWindow
+              chatId={selectedChat}
+              role={user.role === "admin" ? "admin" : "client"}
+              senderId={user.id}
+              senderName={user.name}
+              peerName={user.role === "admin" ? (selectedChatData?.clientName || "Cliente") : "Suporte Tsara"}
+              peerAvatar={user.role === "admin" ? selectedChatData?.clientAvatar : undefined}
+              peerSubtitle={user.role === "admin" ? selectedChatData?.clientEmail : "Equipe de atendimento"}
+              emptyState={
+                <div className="flex-1 flex items-center justify-center text-muted-foreground">
+                  <div className="text-center">
+                    <MessageCircle className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                    <p>Selecione uma conversa para começar</p>
                   </div>
-                }
-              />
-            </div>
+                </div>
+              }
+              hideHeader
+            />
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </>
   )
 }

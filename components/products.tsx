@@ -47,23 +47,23 @@ export function Products() {
   }
 
   return (
-    <section id="produtos" className="relative py-24 md:py-32">
+    <section id="produtos" className="relative py-12 md:py-24 lg:py-32">
       <div className="absolute inset-0 bg-gradient-to-b from-background via-card/50 to-background" />
 
-      <div className="relative mx-auto max-w-7xl px-6">
+      <div className="relative mx-auto max-w-7xl px-4 sm:px-6 md:px-8">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          className="mb-16 text-center"
+          className="mb-12 text-center"
         >
-          <span className="text-sm uppercase tracking-[0.3em] text-gold font-sans">
+          <span className="text-xs sm:text-sm uppercase tracking-[0.3em] text-gold font-sans">
             Nossa Colecao
           </span>
-          <h2 className="mt-4 text-4xl font-light text-foreground md:text-5xl lg:text-6xl">
+          <h2 className="mt-4 text-3xl sm:text-4xl font-light text-foreground md:text-5xl lg:text-6xl">
             Artigos <span className="italic text-gold">Sagrados</span>
           </h2>
-          <p className="mx-auto mt-6 max-w-2xl leading-relaxed text-muted-foreground font-sans">
+          <p className="mx-auto mt-4 sm:mt-6 max-w-2xl leading-relaxed text-muted-foreground font-sans text-sm sm:text-base">
             Cada item foi cuidadosamente selecionado e energizado para auxiliar em sua jornada de autoconhecimento e protecao espiritual.
           </p>
         </motion.div>
@@ -72,7 +72,7 @@ export function Products() {
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          className="mb-12 flex flex-wrap justify-center gap-3"
+          className="mb-8 sm:mb-12 flex flex-wrap justify-center gap-2 sm:gap-3"
         >
           {categories.map((cat) => (
             <button
@@ -80,7 +80,7 @@ export function Products() {
               type="button"
               onClick={() => setActiveCategory(cat.id)}
               className={cn(
-                "rounded-full px-5 py-2 text-sm tracking-wider transition-all duration-300 font-sans",
+                "rounded-full px-3 sm:px-5 py-1.5 sm:py-2 text-xs sm:text-sm tracking-wider transition-all duration-300 font-sans",
                 activeCategory === cat.id
                   ? "bg-gold text-background"
                   : "bg-secondary/50 text-muted-foreground hover:bg-gold/20 hover:text-gold",
@@ -109,7 +109,7 @@ export function Products() {
             initial="hidden"
             whileInView="visible"
             viewport={{ once: true }}
-            className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 md:gap-8"
+            className="grid grid-cols-1 gap-4 sm:gap-6 sm:grid-cols-2 lg:grid-cols-3 md:gap-8"
           >
             {products.map((product, index) => (
               <motion.div
