@@ -16,3 +16,9 @@ public/*firebase-adminsdk*.json
 node_modules
 .next/
 .DS_Store
+
+# Build artifacts
+*.tsbuildinfo
+.firebase/
+*.log
+npm-debug.log*

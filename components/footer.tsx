@@ -46,9 +46,9 @@ export function Footer() {
               <input
                 type="email"
                 placeholder="Seu melhor e-mail"
-                className="px-5 py-3 bg-background border border-border rounded-lg text-foreground font-sans placeholder:text-muted-foreground focus:outline-none focus:border-gold/50 w-full sm:w-72"
+                className="px-5 h-11 bg-background border border-border rounded-lg text-foreground font-sans placeholder:text-muted-foreground focus:outline-none focus:border-gold/50 w-full sm:w-72"
               />
-              <Button className="bg-gold text-background hover:bg-gold/90 font-sans tracking-wider whitespace-nowrap">
+              <Button className="bg-gold text-background hover:bg-gold/90 font-sans tracking-wider whitespace-nowrap h-11">
                 Inscrever-se
               </Button>
             </div>

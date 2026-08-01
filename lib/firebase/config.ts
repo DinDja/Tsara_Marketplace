@@ -1,5 +1,7 @@
 import { initializeApp, getApps } from "firebase/app"
-import { getFirestore } from "firebase/firestore"
+import {
+  initializeFirestore, getFirestore, enableIndexedDbPersistence, CACHE_SIZE_UNLIMITED,
+} from "firebase/firestore"
 import { getAuth } from "firebase/auth"
 
 const firebaseConfig = {
@@ -13,8 +15,25 @@ const firebaseConfig = {
 }
 
 const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig)
-export const db = getFirestore(app)
+
+// initializeFirestore só pode ser chamado uma vez por app; se já houver
+// instância (ex: HMR em dev), ela é reaproveitada via getFirestore.
+export let db: ReturnType<typeof initializeFirestore>
+try {
+  db = initializeFirestore(app, { cacheSizeBytes: CACHE_SIZE_UNLIMITED })
+} catch {
+  db = getFirestore(app)
+}
 export const auth = getAuth(app)
+
+// Habilita cache IndexedDB do Firestore no navegador (uma única vez).
+// Reduz leituras cobradas no servidor: documentos baixados ficam disponíveis offline.
+// Em SSR (Node) ou quando já houver múltiplas abas, falha silenciosamente sem quebrar o app.
+if (typeof window !== "undefined") {
+  enableIndexedDbPersistence(db).catch(() => {
+    // já habilitado em outra aba ou não suportado; seguro ignorar
+  })
+}
 
 export const FIRESTORE_COLLECTIONS = {
   products: "products",

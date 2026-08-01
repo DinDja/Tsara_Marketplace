@@ -1,6 +1,7 @@
 "use client"
 
 import { Suspense, useEffect, useMemo, useState } from "react"
+import type { ReactNode } from "react"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
@@ -73,6 +74,265 @@ function isValidEmail(email: string) {
 
 function isValidPhone(phone: string) {
   return phone.replace(/\D/g, "").length >= 10
+}
+
+function StepTypeCard({
+  consultationTypes,
+  selectedType,
+  loadingTypes,
+  typesError,
+  onSelect,
+}: {
+  consultationTypes: ConsultationType[]
+  selectedType: ConsultationType | null
+  loadingTypes: boolean
+  typesError: string | null
+  onSelect: (type: ConsultationType) => void
+}) {
+  if (typesError) {
+    return <EmptyScheduleState title="Nao foi possivel carregar" description={typesError} />
+  }
+  if (loadingTypes) {
+    return (
+      <div className="flex min-h-80 items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    )
+  }
+  if (consultationTypes.length === 0) {
+    return (
+      <EmptyScheduleState
+        title="Nenhum tipo de consulta disponivel"
+        description="Assim que novos atendimentos forem cadastrados, eles aparecerao aqui."
+      />
+    )
+  }
+  return (
+    <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+      {consultationTypes.map((type) => (
+        <SchedulingTypeCard
+          key={type.id}
+          type={type}
+          selected={selectedType?.id === type.id}
+          onSelect={() => onSelect(type)}
+          actionLabel="Escolher consulta"
+        />
+      ))}
+    </div>
+  )
+}
+
+function StepDateCard({
+  selectedDate,
+  typeLabel,
+  onSelect,
+  onBack,
+  onContinue,
+  canContinue,
+  summary,
+}: {
+  selectedDate: Date | undefined
+  typeLabel: string
+  onSelect: (date?: Date) => void
+  onBack: () => void
+  onContinue: () => void
+  canContinue: boolean
+  summary: ReactNode
+}) {
+  return (
+    <SchedulingStepLayout
+      steps={steps}
+      currentStep={2}
+      title="Escolha a data"
+      description={typeLabel}
+      aside={summary}
+      footer={
+        <>
+          <Button variant="outline" onClick={onBack} className="h-11 px-8 font-sans">Voltar</Button>
+          <Button onClick={onContinue} disabled={!canContinue} className="h-11 px-8 font-sans">Continuar</Button>
+        </>
+      }
+    >
+      <DatePickerSection
+        selectedDate={selectedDate}
+        onSelect={onSelect}
+        disabled={(date) => date.getDay() === 0 || isPastDate(date)}
+      />
+    </SchedulingStepLayout>
+  )
+}
+
+function StepDataField({
+  id,
+  label,
+  type = "text",
+  value,
+  onChange,
+  placeholder,
+  icon,
+  error,
+  className,
+}: {
+  id: string
+  label: string
+  type?: string
+  value: string
+  onChange: (value: string) => void
+  placeholder: string
+  icon: ReactNode
+  error?: boolean
+  className?: string
+}) {
+  return (
+    <div className={className}>
+      <Label htmlFor={id} className="font-sans">{label}</Label>
+      <div className="relative">
+        <Input
+          id={id}
+          type={type}
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          className={cn("h-12 bg-input/50 pl-10 font-sans", error && "border-red-500/50")}
+          placeholder={placeholder}
+        />
+        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">{icon}</span>
+      </div>
+    </div>
+  )
+}
+
+function StepDataCard({
+  formData,
+  setFormData,
+  summary,
+  onBack,
+  onContinue,
+  canContinue,
+}: {
+  formData: { name: string; email: string; phone: string; message: string }
+  setFormData: (updater: (prev: { name: string; email: string; phone: string; message: string }) => { name: string; email: string; phone: string; message: string }) => void
+  summary: ReactNode
+  onBack: () => void
+  onContinue: () => void
+  canContinue: boolean
+}) {
+  return (
+    <SchedulingStepLayout
+      steps={steps}
+      currentStep={4}
+      title="Confirme seus dados"
+      description="Usaremos essas informacoes para confirmar a consulta e enviar o link ou orientacoes de atendimento."
+      aside={summary}
+      footer={
+        <>
+          <Button variant="outline" onClick={onBack} className="h-11 px-8 font-sans">Voltar</Button>
+          <Button onClick={onContinue} disabled={!canContinue} className="h-11 px-8 font-sans">Revisar</Button>
+        </>
+      }
+    >
+      <LiquidGlassCard className="mx-auto max-w-2xl p-5 py-5 lg:p-6 lg:py-6">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <StepDataField
+            id="name"
+            label="Nome completo"
+            value={formData.name}
+            onChange={(value) => setFormData((prev) => ({ ...prev, name: value }))}
+            placeholder="Seu nome"
+            icon={<User className="h-4 w-4" />}
+            className="space-y-2 sm:col-span-2"
+          />
+          <StepDataField
+            id="email"
+            label="Email"
+            type="email"
+            value={formData.email}
+            onChange={(value) => setFormData((prev) => ({ ...prev, email: value }))}
+            placeholder="seu@email.com"
+            icon={<Mail className="h-4 w-4" />}
+            error={!!formData.email && !isValidEmail(formData.email)}
+            className="space-y-2"
+          />
+          <StepDataField
+            id="phone"
+            label="WhatsApp"
+            value={formData.phone}
+            onChange={(value) => setFormData((prev) => ({ ...prev, phone: value }))}
+            placeholder="(00) 00000-0000"
+            icon={<Phone className="h-4 w-4" />}
+            error={!!formData.phone && !isValidPhone(formData.phone)}
+            className="space-y-2"
+          />
+          <div className="space-y-2 sm:col-span-2">
+            <Label htmlFor="message" className="font-sans">Mensagem opcional</Label>
+            <div className="relative">
+              <Textarea
+                id="message"
+                value={formData.message}
+                onChange={(event) => setFormData((prev) => ({ ...prev, message: event.target.value }))}
+                className="min-h-28 resize-none bg-input/50 pl-10 pt-3 font-sans"
+                placeholder="Conte brevemente o que voce gostaria de abordar."
+              />
+              <MessageSquare className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+            </div>
+          </div>
+        </div>
+      </LiquidGlassCard>
+    </SchedulingStepLayout>
+  )
+}
+
+function StepTimeCard({
+  summary,
+  selectedDateLabel,
+  slotError,
+  timeSlots,
+  selectedDate,
+  selectedTime,
+  loadingSlots,
+  onSelect,
+  onBack,
+  onContinue,
+  canContinue,
+}: {
+  summary: ReactNode
+  selectedDateLabel: string | undefined
+  slotError: string | null
+  timeSlots: TimeSlot[]
+  selectedDate: Date | undefined
+  selectedTime: string | null
+  loadingSlots: boolean
+  onSelect: (time: string) => void
+  onBack: () => void
+  onContinue: () => void
+  canContinue: boolean
+}) {
+  return (
+    <SchedulingStepLayout
+      steps={steps}
+      currentStep={3}
+      title="Escolha o horario"
+      description={selectedDateLabel ? `Disponibilidade para ${selectedDateLabel}.` : "Selecione uma data para consultar horarios."}
+      aside={summary}
+      footer={
+        <>
+          <Button variant="outline" onClick={onBack} className="h-11 px-8 font-sans">Voltar</Button>
+          <Button onClick={onContinue} disabled={!canContinue} className="h-11 px-8 font-sans">Continuar</Button>
+        </>
+      }
+    >
+      {slotError ? (
+        <EmptyScheduleState title="Agenda indisponivel" description={slotError} />
+      ) : (
+        <TimeSlotSelector
+          slots={timeSlots}
+          selectedDate={selectedDate}
+          selectedTime={selectedTime}
+          loading={loadingSlots}
+          onSelect={onSelect}
+        />
+      )}
+    </SchedulingStepLayout>
+  )
 }
 
 function AgendamentoContent() {
@@ -338,169 +598,67 @@ function AgendamentoContent() {
                 title="Escolha sua consulta"
                 description="Selecione o atendimento que melhor combina com o momento que voce quer investigar."
               >
-                {typesError ? (
-                  <EmptyScheduleState title="Nao foi possivel carregar" description={typesError} />
-                ) : loadingTypes ? (
-                  <div className="flex min-h-80 items-center justify-center">
-                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                  </div>
-                ) : consultationTypes.length === 0 ? (
-                  <EmptyScheduleState
-                    title="Nenhum tipo de consulta disponivel"
-                    description="Assim que novos atendimentos forem cadastrados, eles aparecerao aqui."
-                    />
-                ) : (
-                  <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-                    {consultationTypes.map((type) => (
-                      <SchedulingTypeCard
-                        key={type.id}
-                        type={type}
-                        selected={selectedType?.id === type.id}
-                        onSelect={() => {
-                          setSelectedType(type)
-                          setAppliedCoupon(null)
-                          setCouponCode("")
-                          setStep(2)
-                        }}
-                        actionLabel="Escolher consulta"
-                      />
-                    ))}
-                  </div>
-                )}
+                <StepTypeCard
+                  consultationTypes={consultationTypes}
+                  selectedType={selectedType}
+                  loadingTypes={loadingTypes}
+                  typesError={typesError}
+                  onSelect={(type) => {
+                    setSelectedType(type)
+                    setAppliedCoupon(null)
+                    setCouponCode("")
+                    setStep(2)
+                  }}
+                />
               </SchedulingStepLayout>
             </motion.div>
           )}
 
           {step === 2 && (
             <motion.div key="step-date" initial={{ opacity: 0, x: 18 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -18 }}>
-              <SchedulingStepLayout
-                steps={steps}
-                currentStep={step}
-                title="Escolha a data"
-                description={selectedType ? `${selectedType.name} - ${selectedType.duration}` : "Escolha quando voce quer ser atendido."}
-                aside={summary}
-                footer={
-                  <>
-                    <Button variant="outline" onClick={() => setStep(1)} className="h-11 px-8 font-sans">Voltar</Button>
-                    <Button onClick={() => continueFromStep(3)} disabled={!canContinue[2]} className="h-11 px-8 font-sans">Continuar</Button>
-                  </>
-                }
-              >
-                <DatePickerSection
-                  selectedDate={selectedDate}
-                  onSelect={(date) => {
-                    setSelectedDate(date)
-                    setSelectedTime(null)
-                  }}
-                  disabled={(date) => date.getDay() === 0 || isPastDate(date)}
-                />
-              </SchedulingStepLayout>
+              <StepDateCard
+                selectedDate={selectedDate}
+                typeLabel={selectedType ? `${selectedType.name} - ${selectedType.duration}` : "Escolha quando voce quer ser atendido."}
+                onSelect={(date) => {
+                  setSelectedDate(date)
+                  setSelectedTime(null)
+                }}
+                onBack={() => setStep(1)}
+                onContinue={() => continueFromStep(3)}
+                canContinue={canContinue[2]}
+                summary={summary}
+              />
             </motion.div>
           )}
 
           {step === 3 && (
             <motion.div key="step-time" initial={{ opacity: 0, x: 18 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -18 }}>
-              <SchedulingStepLayout
-                steps={steps}
-                currentStep={step}
-                title="Escolha o horario"
-                description={selectedDateLabel ? `Disponibilidade para ${selectedDateLabel}.` : "Selecione uma data para consultar horarios."}
-                aside={summary}
-                footer={
-                  <>
-                    <Button variant="outline" onClick={() => setStep(2)} className="h-11 px-8 font-sans">Voltar</Button>
-                    <Button onClick={() => continueFromStep(4)} disabled={!canContinue[3]} className="h-11 px-8 font-sans">Continuar</Button>
-                  </>
-                }
-              >
-                {slotError ? (
-                  <EmptyScheduleState title="Agenda indisponivel" description={slotError} />
-                ) : (
-                  <TimeSlotSelector
-                    slots={timeSlots}
-                    selectedDate={selectedDate}
-                    selectedTime={selectedTime}
-                    loading={loadingSlots}
-                    onSelect={setSelectedTime}
-                  />
-                )}
-              </SchedulingStepLayout>
+              <StepTimeCard
+                summary={summary}
+                selectedDateLabel={selectedDateLabel}
+                slotError={slotError}
+                timeSlots={timeSlots}
+                selectedDate={selectedDate}
+                selectedTime={selectedTime}
+                loadingSlots={loadingSlots}
+                onSelect={setSelectedTime}
+                onBack={() => setStep(2)}
+                onContinue={() => continueFromStep(4)}
+                canContinue={canContinue[3]}
+              />
             </motion.div>
           )}
 
           {step === 4 && (
             <motion.div key="step-data" initial={{ opacity: 0, x: 18 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -18 }}>
-              <SchedulingStepLayout
-                steps={steps}
-                currentStep={step}
-                title="Confirme seus dados"
-                description="Usaremos essas informacoes para confirmar a consulta e enviar o link ou orientacoes de atendimento."
-                aside={summary}
-                footer={
-                  <>
-                    <Button variant="outline" onClick={() => setStep(3)} className="h-11 px-8 font-sans">Voltar</Button>
-                    <Button onClick={() => continueFromStep(5)} disabled={!canContinue[4]} className="h-11 px-8 font-sans">Revisar</Button>
-                  </>
-                }
-              >
-                <LiquidGlassCard className="mx-auto max-w-2xl p-5 py-5 lg:p-6 lg:py-6">
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <div className="space-y-2 sm:col-span-2">
-                      <Label htmlFor="name" className="font-sans">Nome completo</Label>
-                      <div className="relative">
-                        <Input
-                          id="name"
-                          value={formData.name}
-                          onChange={(event) => setFormData({ ...formData, name: event.target.value })}
-                          className="h-12 bg-input/50 pl-10 font-sans"
-                          placeholder="Seu nome"
-                        />
-                        <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="email" className="font-sans">Email</Label>
-                      <div className="relative">
-                        <Input
-                          id="email"
-                          type="email"
-                          value={formData.email}
-                          onChange={(event) => setFormData({ ...formData, email: event.target.value })}
-                          className={cn("h-12 bg-input/50 pl-10 font-sans", formData.email && !isValidEmail(formData.email) && "border-red-500/50")}
-                          placeholder="seu@email.com"
-                        />
-                        <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="phone" className="font-sans">WhatsApp</Label>
-                      <div className="relative">
-                        <Input
-                          id="phone"
-                          value={formData.phone}
-                          onChange={(event) => setFormData({ ...formData, phone: event.target.value })}
-                          className={cn("h-12 bg-input/50 pl-10 font-sans", formData.phone && !isValidPhone(formData.phone) && "border-red-500/50")}
-                          placeholder="(00) 00000-0000"
-                        />
-                        <Phone className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                      </div>
-                    </div>
-                    <div className="space-y-2 sm:col-span-2">
-                      <Label htmlFor="message" className="font-sans">Mensagem opcional</Label>
-                      <div className="relative">
-                        <Textarea
-                          id="message"
-                          value={formData.message}
-                          onChange={(event) => setFormData({ ...formData, message: event.target.value })}
-                          className="min-h-28 resize-none bg-input/50 pl-10 pt-3 font-sans"
-                          placeholder="Conte brevemente o que voce gostaria de abordar."
-                        />
-                        <MessageSquare className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                      </div>
-                    </div>
-                  </div>
-                </LiquidGlassCard>
-              </SchedulingStepLayout>
+              <StepDataCard
+                formData={formData}
+                setFormData={setFormData}
+                summary={summary}
+                onBack={() => setStep(3)}
+                onContinue={() => continueFromStep(5)}
+                canContinue={canContinue[4]}
+              />
             </motion.div>
           )}
 

@@ -1,12 +1,14 @@
 import {
-  collection, getDocs, getDoc, doc, addDoc, updateDoc, deleteDoc, query, where, Timestamp,
+  collection, getDocs, getDoc, doc, updateDoc, deleteDoc, query, where, Timestamp,
   runTransaction,
 } from "firebase/firestore"
 import { db, FIRESTORE_COLLECTIONS } from "@/lib/firebase/config"
+import { cachedQuery, invalidateCache } from "@/lib/firebase/firecache"
 import type { Appointment } from "@/lib/types"
 import type { PaginatedResult } from "./products"
 
-const col = collection(db, FIRESTORE_COLLECTIONS.appointments)
+const COLLECTION = FIRESTORE_COLLECTIONS.appointments
+const col = collection(db, COLLECTION)
 const BLOCKING_STATUSES: Appointment["status"][] = ["pending", "confirmed"]
 
 function slotDocId(date: string, time: string) {
@@ -95,7 +97,7 @@ export async function getAppointmentsPaginated(
 export async function getAppointmentsByDate(date: string): Promise<Appointment[]> {
   try {
     const q = query(col, where("date", "==", date))
-    const snap = await getDocs(q)
+    const snap = await cachedQuery(`appointments:date:${date}`, q, COLLECTION)
     return snap.docs.map(mapDoc).sort((a, b) => a.time.localeCompare(b.time))
   } catch {
     return []
@@ -107,21 +109,9 @@ export async function createAppointment(data: Omit<Appointment, "id" | "createdA
   const id = slotDocId(data.date, data.time)
   const ref = doc(db, FIRESTORE_COLLECTIONS.appointments, id)
 
-  const conflicts = await getDocs(query(col, where("date", "==", data.date)))
-  const hasLegacyConflict = conflicts.docs.some((d) => {
-    const existing = d.data()
-    return d.id !== id && existing.time === data.time && isBlockingStatus(existing.status)
-  })
-  if (hasLegacyConflict) throw new Error("slot-unavailable")
-
-  const existingSlot = await getDoc(ref)
-  if (existingSlot.exists() && !isBlockingStatus(existingSlot.data().status)) {
-    const fallbackRef = await addDoc(col, { ...data, createdAt: now, updatedAt: now })
-    return { ...data, id: fallbackRef.id, createdAt: now.toDate(), updatedAt: now.toDate() }
-  }
-
   await runTransaction(db, async (transaction) => {
     const existing = await transaction.get(ref)
+
     if (existing.exists() && isBlockingStatus(existing.data().status)) {
       throw new Error("slot-unavailable")
     }
@@ -133,21 +123,23 @@ export async function createAppointment(data: Omit<Appointment, "id" | "createdA
     })
   })
 
+  invalidateCache(COLLECTION)
   return { ...data, id, createdAt: now.toDate(), updatedAt: now.toDate() }
 }
 
 export async function updateAppointmentStatus(id: string, status: Appointment["status"], notes?: string): Promise<Appointment> {
   const update: Record<string, any> = { status, updatedAt: Timestamp.now() }
   if (notes !== undefined) update.notes = notes
-  await updateDoc(doc(db, FIRESTORE_COLLECTIONS.appointments, id), update)
-  const snap = await getDoc(doc(db, FIRESTORE_COLLECTIONS.appointments, id))
+  await updateDoc(doc(db, COLLECTION, id), update)
+  invalidateCache(COLLECTION)
+  const snap = await getDoc(doc(db, COLLECTION, id))
   return mapDoc(snap)
 }
 
 export async function getOccupiedSlots(date: string): Promise<string[]> {
   try {
     const q = query(col, where("date", "==", date))
-    const snap = await getDocs(q)
+    const snap = await cachedQuery(`appointments:occupied:${date}`, q, COLLECTION)
     return snap.docs
       .filter((d) => isBlockingStatus(d.data().status))
       .map((d) => d.data().time)

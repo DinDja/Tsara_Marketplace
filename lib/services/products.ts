@@ -3,6 +3,7 @@ import {
   limit, orderBy, startAfter, startAt, endAt, getCountFromServer,
 } from "firebase/firestore"
 import { db, FIRESTORE_COLLECTIONS } from "@/lib/firebase/config"
+import { cachedQuery, cachedDoc, invalidateCache } from "@/lib/firebase/firecache"
 import { encodeImage, decodeImage } from "@/lib/image"
 import type { Product } from "@/lib/types"
 
@@ -13,8 +14,9 @@ export interface PaginatedResult<T> {
 }
 
 const PAGE_SIZE = 12
+const COLLECTION = FIRESTORE_COLLECTIONS.products
 
-const col = collection(db, FIRESTORE_COLLECTIONS.products)
+const col = collection(db, COLLECTION)
 
 function mapDoc(d: any): Product {
   const data = d.data()
@@ -49,7 +51,7 @@ function mapDoc(d: any): Product {
 
 export async function getProducts(): Promise<Product[]> {
   try {
-    const snap = await getDocs(col)
+    const snap = await cachedQuery("products:all", col, COLLECTION)
     return snap.docs.map(mapDoc)
   } catch {
     return []
@@ -67,7 +69,7 @@ export async function getProductOptions(search = ""): Promise<ProductOption[]> {
     const constraints: any[] = [orderBy("name")]
     if (q) constraints.push(startAt(q), endAt(q + "\uf8ff"))
     constraints.push(limit(50))
-    const snap = await getDocs(query(col, ...constraints))
+    const snap = await cachedQuery(`products:options:${q || "all"}`, query(col, ...constraints), COLLECTION)
     return snap.docs.map((d) => ({ id: d.id, name: d.data().name ?? "" }))
   } catch {
     return []
@@ -83,8 +85,7 @@ export async function getProductsPaginated(
     if (filters?.category && filters.category !== "all") {
       countConstraints.push(where("category", "==", filters.category))
     }
-    const countSnap = await getCountFromServer(query(col, ...countConstraints))
-    const total = countSnap.data().count
+    const total = (await getCountFromServer(query(col, ...countConstraints))).data().count
 
     const pageSize = filters?.category && filters.category !== "all" ? 30 : PAGE_SIZE
 
@@ -95,14 +96,14 @@ export async function getProductsPaginated(
 
     if (page > 1) {
       const prevQ = query(col, ...dataConstraints, limit((page - 1) * pageSize))
-      const prevSnap = await getDocs(prevQ)
+      const prevSnap = await cachedQuery(`products:page:${filters?.category ?? "all"}:${page}:${pageSize}:prev`, prevQ, COLLECTION)
       if (prevSnap.docs.length > 0) {
         dataConstraints.push(startAfter(prevSnap.docs[prevSnap.docs.length - 1]))
       }
     }
 
     dataConstraints.push(limit(pageSize))
-    const snap = await getDocs(query(col, ...dataConstraints))
+    const snap = await cachedQuery(`products:page:${filters?.category ?? "all"}:${page}:${pageSize}`, query(col, ...dataConstraints), COLLECTION)
     const docs = snap.docs.map(mapDoc)
     const totalPages = Math.ceil(total / pageSize)
 
@@ -114,7 +115,7 @@ export async function getProductsPaginated(
 
 export async function getProductById(id: string): Promise<Product | null> {
   try {
-    const snap = await getDoc(doc(db, FIRESTORE_COLLECTIONS.products, id))
+    const snap = await cachedDoc(`products:doc:${id}`, doc(db, COLLECTION, id), COLLECTION)
     if (!snap.exists()) return null
     return mapDoc(snap)
   } catch {
@@ -125,7 +126,7 @@ export async function getProductById(id: string): Promise<Product | null> {
 export async function getProductByCourseId(courseId: string): Promise<Product | null> {
   try {
     const q = query(col, where("courseId", "==", courseId), limit(1))
-    const snap = await getDocs(q)
+    const snap = await cachedQuery(`products:course:${courseId}`, q, COLLECTION)
     if (snap.empty) return null
     return mapDoc(snap.docs[0])
   } catch {
@@ -136,7 +137,7 @@ export async function getProductByCourseId(courseId: string): Promise<Product | 
 export async function getFeaturedProducts(): Promise<Product[]> {
   try {
     const q = query(col, where("featured", "==", true))
-    const snap = await getDocs(q)
+    const snap = await cachedQuery("products:featured", q, COLLECTION)
     return snap.docs.map(mapDoc)
   } catch {
     return []
@@ -147,7 +148,7 @@ export async function getProductsByCategory(category: string): Promise<Product[]
   try {
     if (!category || category === "all") return getProducts()
     const q = query(col, where("category", "==", category))
-    const snap = await getDocs(q)
+    const snap = await cachedQuery(`products:category:${category}`, q, COLLECTION)
     return snap.docs.map(mapDoc)
   } catch {
     return []
@@ -161,11 +162,11 @@ export async function getProductsByCategoryLimited(
   try {
     if (!category || category === "all") {
       const q = query(col, orderBy("name"), limit(limitCount))
-      const snap = await getDocs(q)
+      const snap = await cachedQuery(`products:category:all:${limitCount}`, q, COLLECTION)
       return snap.docs.map(mapDoc)
     }
     const q = query(col, where("category", "==", category), orderBy("name"), limit(limitCount))
-    const snap = await getDocs(q)
+    const snap = await cachedQuery(`products:category:${category}:${limitCount}`, q, COLLECTION)
     return snap.docs.map(mapDoc)
   } catch {
     return []
@@ -180,6 +181,7 @@ export async function createProduct(data: Omit<Product, "id" | "createdAt" | "up
   if (payload.stock >= 0 && payload.stockManaged === undefined) payload.stockManaged = true
   if (payload.image) payload.image = await encodeImage(payload.image)
   const ref = await addDoc(col, payload)
+  invalidateCache(COLLECTION)
   return { ...data, id: ref.id, createdAt: now.toDate(), updatedAt: now.toDate() }
 }
 
@@ -189,10 +191,12 @@ export async function updateProduct(id: string, data: Partial<Product>): Promise
   if (payload.price > 0) payload.priceOnRequest = false
   if (payload.stock >= 0 && payload.stockManaged === undefined) payload.stockManaged = true
   if (payload.image) payload.image = await encodeImage(payload.image)
-  await updateDoc(doc(db, FIRESTORE_COLLECTIONS.products, id), payload)
+  await updateDoc(doc(db, COLLECTION, id), payload)
+  invalidateCache(COLLECTION)
   return (await getProductById(id))!
 }
 
 export async function deleteProduct(id: string): Promise<void> {
-  await deleteDoc(doc(db, FIRESTORE_COLLECTIONS.products, id))
+  await deleteDoc(doc(db, COLLECTION, id))
+  invalidateCache(COLLECTION)
 }

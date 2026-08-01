@@ -6,7 +6,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { items, orderNsu, customer, address, redirectUrl, subtotalCents, shippingCents, discountCents, cardType } = body
 
-    if (!items?.length) {
+    if (!Array.isArray(items) || !items.length) {
       return NextResponse.json({ error: "Items são obrigatórios" }, { status: 400 })
     }
     if (!orderNsu) {
@@ -17,29 +17,45 @@ export async function POST(request: NextRequest) {
     const origin = request.nextUrl.origin
     const redirect = redirectUrl || `${origin}/pagamento/sucesso`
 
-    const apiItems: Array<{ description: string; quantity: number; price: number }> = [
-      ...items.map((i: any) => ({
-        description: i.description,
-        quantity: i.quantity,
-        price: Math.max(100, i.price),
-      })),
-    ]
+    const apiItems: Array<{ description: string; quantity: number; price: number }> = []
+    for (let i = 0; i < items.length; i++) {
+      const it = items[i]
+      const description = typeof it?.description === "string" ? it.description.trim() : ""
+      const quantity = Number(it?.quantity)
+      const price = Number(it?.price)
+      if (!description) {
+        return NextResponse.json({ error: `Item ${i + 1}: descrição obrigatória` }, { status: 400 })
+      }
+      if (!Number.isInteger(quantity) || quantity <= 0) {
+        return NextResponse.json({ error: `Item ${i + 1}: quantidade inválida` }, { status: 400 })
+      }
+      if (!Number.isFinite(price) || price <= 0) {
+        return NextResponse.json({ error: `Item ${i + 1}: preço inválido` }, { status: 400 })
+      }
+      apiItems.push({
+        description,
+        quantity,
+        price: Math.max(100, Math.round(price)),
+      })
+    }
 
-    const hasShipping = shippingCents && shippingCents > 0
-    const hasDiscount = discountCents && discountCents > 0
+    const shipping = Number(shippingCents) || 0
+    const discount = Number(discountCents) || 0
+    const hasShipping = shipping > 0
+    const hasDiscount = discount > 0
 
     if (hasShipping) {
       apiItems.push({
         description: "Frete",
         quantity: 1,
-        price: shippingCents,
+        price: shipping,
       })
     }
 
     if (hasDiscount) {
       const totalItemsCents = apiItems.reduce((s: number, it: any) => s + it.price * it.quantity, 0)
       if (totalItemsCents > 0) {
-        const ratio = Math.max(0, (totalItemsCents - discountCents) / totalItemsCents)
+        const ratio = Math.max(0, (totalItemsCents - discount) / totalItemsCents)
         for (const item of apiItems) {
           item.price = Math.max(100, Math.round(item.price * ratio))
         }
@@ -70,7 +86,7 @@ export async function POST(request: NextRequest) {
       payload.customer.card_type = cardType
     }
 
-    console.log("[InfinitePay/links] payload:", JSON.stringify(payload))
+    console.log("[InfinitePay/links] payload items:", apiItems.length, "shipping:", hasShipping, "discount:", hasDiscount)
 
     const res = await fetch(`${INFINITEPAY_API_BASE}${INFINITEPAY_CHECKOUT_PATH}`, {
       method: "POST",
@@ -79,7 +95,7 @@ export async function POST(request: NextRequest) {
     })
 
     const data = await res.json()
-    console.log("[InfinitePay/links] response status:", res.status, "body:", JSON.stringify(data))
+    console.log("[InfinitePay/links] response status:", res.status)
 
     if (!res.ok) throw new Error(data?.message || data?.error || "Erro ao criar link de pagamento")
 
@@ -102,9 +118,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ url: checkoutUrl, slug: data.slug || null })
   } catch (err: any) {
     console.error("[InfinitePay/links]", err)
-    return NextResponse.json({
-      error: err.message || "Erro interno ao criar checkout",
-      detail: err.stack || null,
-    }, { status: 500 })
+    const msg = err?.message || "Erro interno ao criar checkout"
+    return NextResponse.json({ error: msg }, { status: 500 })
   }
 }

@@ -137,6 +137,7 @@ function toAbsoluteImageUrl(value) {
 }
 
 function parseImages(rawProduct) {
+  const seen = new Set()
   const images = []
   const rawImages = String(rawProduct.imagem_produto || "")
     .split(",")
@@ -145,11 +146,17 @@ function parseImages(rawProduct) {
 
   for (const image of rawImages) {
     const url = toAbsoluteImageUrl(image)
-    if (url && !images.includes(url)) images.push(url)
+    if (url && !seen.has(url)) {
+      seen.add(url)
+      images.push(url)
+    }
   }
 
   const expanded = toAbsoluteImageUrl(rawProduct.imagem_ampliada)
-  if (expanded && !images.includes(expanded)) images.push(expanded)
+  if (expanded && !seen.has(expanded)) {
+    seen.add(expanded)
+    images.push(expanded)
+  }
 
   return images
 }
@@ -221,8 +228,9 @@ async function fetchCategory(category) {
 }
 
 async function fetchProducts(options) {
-  const selectedCategories = options.categoryIds.length
-    ? categories.filter((category) => options.categoryIds.includes(category.id))
+  const categoryIdSet = new Set(options.categoryIds || [])
+  const selectedCategories = categoryIdSet.size
+    ? categories.filter((category) => categoryIdSet.has(category.id))
     : categories
 
   if (selectedCategories.length === 0) {

@@ -3,6 +3,7 @@ import {
   limit, orderBy, startAfter, getCountFromServer, query,
 } from "firebase/firestore"
 import { db } from "@/lib/firebase/config"
+import { cachedQuery, cachedDoc } from "@/lib/firebase/firecache"
 import { encodeImage, decodeImage } from "@/lib/image"
 import type { PaginatedResult } from "./products"
 
@@ -21,7 +22,8 @@ export interface ConsultationType {
   updatedAt: Date
 }
 
-const col = collection(db, "consultations")
+const COLLECTION = "consultations"
+const col = collection(db, COLLECTION)
 
 function mapDoc(d: any): ConsultationType {
   const data = d.data()
@@ -43,7 +45,7 @@ function mapDoc(d: any): ConsultationType {
 
 export async function getConsultationTypes(): Promise<ConsultationType[]> {
   try {
-    const snap = await getDocs(col)
+    const snap = await cachedQuery("consultations:all", col, COLLECTION)
     return snap.docs.map(mapDoc)
   } catch {
     return []
@@ -52,7 +54,8 @@ export async function getConsultationTypes(): Promise<ConsultationType[]> {
 
 export async function getConsultationTypesLimited(limitCount: number): Promise<ConsultationType[]> {
   try {
-    const snap = await getDocs(query(col, orderBy("name"), limit(limitCount)))
+    const q = query(col, orderBy("name"), limit(limitCount))
+    const snap = await cachedQuery(`consultations:limited:${limitCount}`, q, COLLECTION)
     return snap.docs.map(mapDoc)
   } catch {
     return []
@@ -61,7 +64,8 @@ export async function getConsultationTypesLimited(limitCount: number): Promise<C
 
 export async function getConsultationTypeById(id: string): Promise<ConsultationType | null> {
   try {
-    const snap = await getDoc(doc(db, "consultations", id))
+    const ref = doc(db, COLLECTION, id)
+    const snap = await cachedDoc(`consultations:doc:${id}`, ref, COLLECTION)
     if (!snap.exists()) return null
     return mapDoc(snap)
   } catch {
@@ -95,21 +99,20 @@ export async function getConsultationTypesPaginated(
   pageSize = 20
 ): Promise<PaginatedResult<ConsultationType>> {
   try {
-    const countSnap = await getCountFromServer(col)
-    const total = countSnap.data().count
+    const total = (await getCountFromServer(col)).data().count
 
     const dataConstraints: any[] = [orderBy("name")]
 
     if (page > 1) {
       const prevQ = query(col, ...dataConstraints, limit((page - 1) * pageSize))
-      const prevSnap = await getDocs(prevQ)
+      const prevSnap = await cachedQuery(`consultations:page:${page}:${pageSize}:prev`, prevQ, COLLECTION)
       if (prevSnap.docs.length > 0) {
         dataConstraints.push(startAfter(prevSnap.docs[prevSnap.docs.length - 1]))
       }
     }
 
     dataConstraints.push(limit(pageSize))
-    const snap = await getDocs(query(col, ...dataConstraints))
+    const snap = await cachedQuery(`consultations:page:${page}:${pageSize}`, query(col, ...dataConstraints), COLLECTION)
     const docs = snap.docs.map(mapDoc)
     const totalPages = Math.ceil(total / pageSize)
 

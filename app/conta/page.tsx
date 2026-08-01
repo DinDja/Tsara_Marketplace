@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import {
   ArrowLeft, User, Mail, Phone, Save, LogOut, Shield,
   MapPin, Plus, Trash2, Home, Lock, KeyRound, Camera,
-  AlertCircle, CheckCircle2, Loader2, MessageCircle,
+  AlertCircle, CheckCircle2, Loader2,
 } from "lucide-react"
 import { MoonIcon } from "@/components/moon-icon"
 import { Button } from "@/components/ui/button"
@@ -182,9 +182,6 @@ export default function ContaPage() {
               </nav>
 
               <div className="space-y-2 pt-2">
-                <Button asChild variant="outline" className="w-full justify-start gap-2 font-sans">
-                  <Link href="/chat"><MessageCircle className="w-4 h-4" /> Suporte / Chat</Link>
-                </Button>
                 {user.role === "admin" && (
                   <Button asChild variant="outline" className="w-full justify-start gap-2 font-sans">
                     <Link href="/admin"><Shield className="w-4 h-4" /> Painel Admin</Link>

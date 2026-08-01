@@ -35,9 +35,13 @@ function compressImage(base64: string): Promise<string> {
 export async function encodeImage(base64: string): Promise<string | { _chunks: string[]; _chunkCount: number }> {
   const compressed = await compressImage(base64)
   if (compressed.length <= CHUNK_SIZE) return compressed
-  const chunks: string[] = []
-  for (let i = 0; i < compressed.length; i += CHUNK_SIZE) chunks.push(compressed.slice(i, i + CHUNK_SIZE))
-  return { _chunks: chunks, _chunkCount: chunks.length }
+  const chunkCount = Math.ceil(compressed.length / CHUNK_SIZE)
+  const chunks = new Array<string>(chunkCount)
+  for (let i = 0; i < chunkCount; i++) {
+    const start = i * CHUNK_SIZE
+    chunks[i] = compressed.slice(start, Math.min(start + CHUNK_SIZE, compressed.length))
+  }
+  return { _chunks: chunks, _chunkCount: chunkCount }
 }
 
 export function decodeImage(image: string | { _chunks?: string[]; _chunkCount?: number } | null | undefined): string {
