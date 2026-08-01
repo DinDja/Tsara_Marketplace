@@ -128,13 +128,16 @@ export default function CursoDetalhePage() {
                 </motion.div>
               )}
 
-              {owned && current && embedUrl ? (
+              {current && embedUrl ? (
                 <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} className="space-y-3">
                   <h2 className="text-lg font-semibold text-foreground">
                     {current.type === "video" ? <PlayCircle className="inline w-5 h-5 text-primary mr-1.5 -mt-0.5" /> : <FileText className="inline w-5 h-5 text-primary mr-1.5 -mt-0.5" />}
                     {current.title}
                     {isLessonNew(current) && (
                       <span className="ml-2 rounded-md bg-green-500/15 text-green-600 dark:text-green-400 px-1.5 py-0.5 text-[10px] font-sans font-bold uppercase tracking-wide align-middle">Nova</span>
+                    )}
+                    {!owned && (
+                      <span className="ml-2 rounded-md bg-muted text-muted-foreground px-1.5 py-0.5 text-[10px] font-sans font-bold uppercase tracking-wide align-middle">Prévia</span>
                     )}
                   </h2>
                   <div
@@ -147,17 +150,46 @@ export default function CursoDetalhePage() {
                       key={current.id}
                       src={embedUrl}
                       sandbox="allow-same-origin allow-scripts allow-fullscreen"
-                      className="aspect-video w-full"
+                      className={cn("aspect-video w-full", !owned && "blur-md pointer-events-none")}
                       allow="autoplay; fullscreen; encrypted-media"
                       allowFullScreen
                     />
-                    <span className="pointer-events-none absolute right-2 bottom-2 z-10 rounded bg-black/45 px-2 py-0.5 text-[10px] font-sans font-medium text-white/80 select-none">
-                      {course.name} · {user?.name || user?.email || "aluno"}
-                    </span>
+                    {owned ? (
+                      <span className="pointer-events-none absolute right-2 bottom-2 z-10 rounded bg-black/45 px-2 py-0.5 text-[10px] font-sans font-medium text-white/80 select-none">
+                        {course.name} · {user?.name || user?.email || "aluno"}
+                      </span>
+                    ) : (
+                      <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-4 bg-gradient-to-b from-black/40 via-background/70 to-background p-6 text-center">
+                        <span className="flex h-14 w-14 items-center justify-center rounded-full bg-primary/90 text-primary-foreground shadow-lg">
+                          <Lock className="h-6 w-6" />
+                        </span>
+                        <div>
+                          <p className="text-lg font-semibold text-foreground">Conteúdo exclusivo</p>
+                          <p className="mt-1 max-w-sm text-sm font-sans leading-relaxed text-muted-foreground">
+                            Adquira este curso para desbloquear esta aula e todo o conteúdo do curso.
+                          </p>
+                        </div>
+                        {isAuthenticated ? (
+                          !isFree && (
+                            <Button onClick={handleBuy} disabled={productLoading || !product} className="bg-primary hover:bg-primary/90 font-sans gap-2">
+                              <ShoppingBag className="w-4 h-4" /> Comprar para desbloquear
+                            </Button>
+                          )
+                        ) : (
+                          <Button asChild className="bg-primary hover:bg-primary/90 font-sans gap-2">
+                            <Link href="/login">
+                              <UserRound className="w-4 h-4" /> Entre para comprar
+                            </Link>
+                          </Button>
+                        )}
+                      </div>
+                    )}
                   </div>
                   <div className="flex items-center justify-between gap-2 flex-wrap">
                     <p className="text-xs font-sans text-muted-foreground">
-                      {current.type === "video" ? "O player do Google Drive pode levar alguns segundos para carregar." : "Use as ferramentas do visualizador para navegar pelo PDF."}
+                      {owned
+                        ? (current.type === "video" ? "O player do Google Drive pode levar alguns segundos para carregar." : "Use as ferramentas do visualizador para navegar pelo PDF.")
+                        : "Esta é a prévia da aula. Os conteúdos ficam desbloqueados após a compra."}
                     </p>
                     {current.duration && (
                       <span className="flex items-center gap-1 text-xs font-sans text-muted-foreground">
@@ -166,7 +198,7 @@ export default function CursoDetalhePage() {
                     )}
                   </div>
 
-                  {current.extraUrl && extraEmbed && (
+                  {owned && current.extraUrl && extraEmbed && (
                     <div className="rounded-xl border border-border bg-card p-4 space-y-3">
                       <div className="flex items-center gap-2">
                         <div className="flex items-center gap-2">
@@ -199,7 +231,7 @@ export default function CursoDetalhePage() {
                     </div>
                   )}
                 </motion.section>
-              ) : owned && lessons.length === 0 ? (
+              ) : lessons.length === 0 ? (
                 <EmptyScheduleState title="Curso sem aulas" description="As aulas deste curso ainda não foram publicadas." />
               ) : null}
 
@@ -217,12 +249,10 @@ export default function CursoDetalhePage() {
                       <li key={l.id}>
                         <button
                           type="button"
-                          onClick={() => owned && setSelected(l.id)}
-                          disabled={!owned}
+                          onClick={() => setSelected(l.id)}
                           className={cn(
-                            "flex w-full items-center gap-3 px-5 py-3.5 text-left transition-colors",
-                            owned ? "hover:bg-secondary/40" : "cursor-not-allowed opacity-60",
-                            owned && current?.id === l.id && "bg-primary/5"
+                            "flex w-full items-center gap-3 px-5 py-3.5 text-left transition-colors hover:bg-secondary/40",
+                            current?.id === l.id && "bg-primary/5"
                           )}
                         >
                           <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-secondary/50 text-muted-foreground text-xs font-sans font-medium">
