@@ -308,6 +308,16 @@ export default function MeusPedidos() {
                                 )}
 
                                 <div className="flex flex-wrap gap-2 pt-1">
+                                  {order.status === "pending" && order.checkoutUrl && (
+                                    <Button size="sm" className="font-sans text-xs gap-1.5 bg-primary hover:bg-primary/90" asChild>
+                                      <a href={order.checkoutUrl}><CreditCard className="w-3.5 h-3.5" /> Retomar pagamento</a>
+                                    </Button>
+                                  )}
+                                  {order.status === "delivered" && order.items.some((i) => i.category === "Cursos") && (
+                                    <Button size="sm" className="font-sans text-xs gap-1.5 bg-primary hover:bg-primary/90" asChild>
+                                      <Link href="/cursos"><CheckCircle2 className="w-3.5 h-3.5" /> Acessar curso</Link>
+                                    </Button>
+                                  )}
                                   {order.status === "delivered" && (
                                     <Button size="sm" variant="outline" className="font-sans text-xs gap-1.5" asChild>
                                       <Link href={`/produto/${order.items[0]?.productId}`}><RotateCcw className="w-3.5 h-3.5" /> Comprar novamente</Link>

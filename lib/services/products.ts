@@ -1,6 +1,6 @@
 import {
   collection, getDocs, getDoc, doc, addDoc, updateDoc, deleteDoc, query, where, Timestamp,
-  limit, orderBy, startAfter, getCountFromServer,
+  limit, orderBy, startAfter, startAt, endAt, getCountFromServer,
 } from "firebase/firestore"
 import { db, FIRESTORE_COLLECTIONS } from "@/lib/firebase/config"
 import { encodeImage, decodeImage } from "@/lib/image"
@@ -36,6 +36,7 @@ function mapDoc(d: any): Product {
     freeShipping: data.freeShipping ?? false,
     priceOnRequest: data.priceOnRequest ?? false,
     stockManaged: data.stockManaged ?? true,
+    courseId: data.courseId,
     source: data.source ? {
       ...data.source,
       importedAt: data.source.importedAt?.toDate?.() ?? data.source.importedAt,
@@ -50,6 +51,24 @@ export async function getProducts(): Promise<Product[]> {
   try {
     const snap = await getDocs(col)
     return snap.docs.map(mapDoc)
+  } catch {
+    return []
+  }
+}
+
+export interface ProductOption {
+  id: string
+  name: string
+}
+
+export async function getProductOptions(search = ""): Promise<ProductOption[]> {
+  try {
+    const q = search.trim()
+    const constraints: any[] = [orderBy("name")]
+    if (q) constraints.push(startAt(q), endAt(q + "\uf8ff"))
+    constraints.push(limit(50))
+    const snap = await getDocs(query(col, ...constraints))
+    return snap.docs.map((d) => ({ id: d.id, name: d.data().name ?? "" }))
   } catch {
     return []
   }
@@ -103,6 +122,17 @@ export async function getProductById(id: string): Promise<Product | null> {
   }
 }
 
+export async function getProductByCourseId(courseId: string): Promise<Product | null> {
+  try {
+    const q = query(col, where("courseId", "==", courseId), limit(1))
+    const snap = await getDocs(q)
+    if (snap.empty) return null
+    return mapDoc(snap.docs[0])
+  } catch {
+    return null
+  }
+}
+
 export async function getFeaturedProducts(): Promise<Product[]> {
   try {
     const q = query(col, where("featured", "==", true))
@@ -145,8 +175,9 @@ export async function getProductsByCategoryLimited(
 export async function createProduct(data: Omit<Product, "id" | "createdAt" | "updatedAt">): Promise<Product> {
   const now = Timestamp.now()
   const payload: any = { ...data, createdAt: now, updatedAt: now }
+  Object.keys(payload).forEach((k) => { if (payload[k] === undefined) delete payload[k] })
   if (payload.price > 0) payload.priceOnRequest = false
-  if (payload.stock >= 0) payload.stockManaged = true
+  if (payload.stock >= 0 && payload.stockManaged === undefined) payload.stockManaged = true
   if (payload.image) payload.image = await encodeImage(payload.image)
   const ref = await addDoc(col, payload)
   return { ...data, id: ref.id, createdAt: now.toDate(), updatedAt: now.toDate() }
@@ -154,8 +185,9 @@ export async function createProduct(data: Omit<Product, "id" | "createdAt" | "up
 
 export async function updateProduct(id: string, data: Partial<Product>): Promise<Product> {
   const payload: any = { ...data, updatedAt: Timestamp.now() }
+  Object.keys(payload).forEach((k) => { if (payload[k] === undefined) delete payload[k] })
   if (payload.price > 0) payload.priceOnRequest = false
-  if (payload.stock >= 0) payload.stockManaged = true
+  if (payload.stock >= 0 && payload.stockManaged === undefined) payload.stockManaged = true
   if (payload.image) payload.image = await encodeImage(payload.image)
   await updateDoc(doc(db, FIRESTORE_COLLECTIONS.products, id), payload)
   return (await getProductById(id))!

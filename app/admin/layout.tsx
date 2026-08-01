@@ -17,6 +17,7 @@ import {
   Percent,
   ShoppingCart,
   MessageCircle,
+  GraduationCap,
 } from "lucide-react";
 import { MoonIcon } from "@/components/moon-icon";
 import { cn } from "@/lib/utils";
@@ -29,6 +30,7 @@ const navigation = [
   { name: "Dashboard", href: "/admin", icon: LayoutDashboard },
   { name: "Agendamentos", href: "/admin/agendamentos", icon: Calendar },
   { name: "Consultas", href: "/admin/consultas", icon: Star },
+  { name: "Cursos", href: "/admin/cursos", icon: GraduationCap },
   { name: "Produtos", href: "/admin/produtos", icon: Package },
   { name: "Pedidos", href: "/admin/pedidos", icon: ShoppingCart },
   { name: "Clientes", href: "/admin/clientes", icon: Users },

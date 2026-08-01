@@ -6,6 +6,7 @@ export const PRODUCT_CATEGORIES = [
   { id: "Oráculos", label: "Oráculos" },
   { id: "Acessórios", label: "Acessórios" },
   { id: "Rituais", label: "Rituais" },
+  { id: "Cursos", label: "Cursos" },
 ] as const
 
 export const CONSULTATION_TYPES_DATA = [
@@ -27,6 +28,7 @@ export const MODALITIES = [
 export const NAV_LINKS = [
   { href: "/produtos", label: "Loja" },
   { href: "/consultas", label: "Consultas" },
+  { href: "/cursos", label: "Cursos" },
   { href: "#depoimentos", label: "Depoimentos" },
 ] as const
 

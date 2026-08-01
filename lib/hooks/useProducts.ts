@@ -3,11 +3,15 @@
 import { useEffect } from "react"
 import { useAsyncData } from "./useAsync"
 import { useFirestorePagination } from "./useFirestorePagination"
-import { getProducts, getProductById, getFeaturedProducts, getProductsByCategory, getProductsByCategoryLimited, getProductsPaginated } from "@/lib/services"
+import { getProducts, getProductById, getFeaturedProducts, getProductsByCategory, getProductsByCategoryLimited, getProductsPaginated, getProductOptions } from "@/lib/services"
 import type { Product } from "@/lib/types"
 
 export function useProducts() {
   return useAsyncData(getProducts, [])
+}
+
+export function useProductOptions(search = "") {
+  return useAsyncData(() => getProductOptions(search), [search])
 }
 
 export function useProduct(id: string) {

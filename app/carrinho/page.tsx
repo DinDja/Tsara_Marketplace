@@ -28,14 +28,17 @@ import { lookupCep, calculateShipping } from "@/lib/services/shipping"
 import { getCouponByCode } from "@/lib/services"
 import { toast } from "sonner"
 import type { CepResult, FreightOption } from "@/lib/services/shipping"
-import type { Coupon, Product, UserAddress } from "@/lib/types"
+import type { CartItem, Coupon, Product, UserAddress } from "@/lib/types"
 
 function isPurchasable(product: Product) {
-  return product.status !== "inactive"
-    && !product.priceOnRequest
-    && product.price > 0
-    && product.stockManaged !== false
-    && product.stock > 0
+  if (product.status === "inactive" || product.priceOnRequest) return false
+  if (product.price <= 0) return false
+  if (product.stockManaged === false) return true
+  return product.stock > 0
+}
+
+function isDigitalItem(item: CartItem) {
+  return item.category === "Cursos"
 }
 
 export default function CarrinhoPage() {
@@ -59,7 +62,8 @@ export default function CarrinhoPage() {
   }, [user])
 
   const discount = appliedCoupon ? subtotal * (appliedCoupon.discount / 100) : 0
-  const shipping = selectedFreight?.price ?? 0
+  const allDigital = items.length > 0 && items.every(isDigitalItem)
+  const shipping = allDigital ? 0 : (selectedFreight?.price ?? 0)
   const total = subtotal - discount + shipping
 
   const handleAddressSelect = (addrId: string) => {
@@ -129,8 +133,8 @@ export default function CarrinhoPage() {
 
   const handleCheckout = async () => {
     if (!user) { toast.error("Faça login para finalizar o pedido"); return }
-    if (!selectedAddress) { toast.error("Selecione um endereço de entrega"); return }
-    if (!selectedFreight) { toast.error("Selecione o frete"); return }
+    if (!allDigital && !selectedAddress) { toast.error("Selecione um endereço de entrega"); return }
+    if (!allDigital && !selectedFreight) { toast.error("Selecione o frete"); return }
 
     setSubmitting(true)
     try {
@@ -163,7 +167,7 @@ export default function CarrinhoPage() {
         discount,
         shipping,
         coupon: appliedCoupon?.code,
-        shippingAddress: buildAddressString(selectedAddress),
+        shippingAddress: allDigital ? undefined : buildAddressString(selectedAddress!),
         paymentMethod: "InfinitePay",
         status: "pending",
       }
@@ -197,11 +201,13 @@ export default function CarrinhoPage() {
           email: user.email,
           ...((phoneNumber) && { phone_number: phoneNumber }),
         },
-        address: {
-          cep: selectedAddress.cep.replace(/\D/g, ""),
-          number: selectedAddress.number,
-          complement: selectedAddress.complement || "",
-        },
+        address: allDigital
+            ? { cep: "01001000", number: "0", complement: "" }
+            : {
+                cep: selectedAddress!.cep.replace(/\D/g, ""),
+                number: selectedAddress!.number,
+                complement: selectedAddress!.complement || "",
+              },
       })
 
       await updateOrder(order.id, {
@@ -316,6 +322,7 @@ export default function CarrinhoPage() {
                 {appliedCoupon && <p className="text-sm font-sans text-green-500 mt-2">Cupom {appliedCoupon.code} — {appliedCoupon.discount}% de desconto</p>}
               </div>
 
+              {!allDigital && (
               <div className="bg-card border border-border rounded-xl p-4 lg:p-6">
                 <div className="flex items-center gap-2 mb-3">
                   <MapPin className="w-4 h-4 text-primary" /><span className="font-semibold text-foreground">Calcular Frete</span>
@@ -365,13 +372,14 @@ export default function CarrinhoPage() {
                   </div>
                 )}
               </div>
+            )}
             </div>
 
             <div className="lg:col-span-1">
               <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}
                 className="bg-card border border-border rounded-xl p-6 sticky top-24 space-y-6">
 
-                {user && (
+                {user && !allDigital && (
                   <div>
                     <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
                       <MapPin className="w-4 h-4 text-primary" /> Endereço de Entrega
@@ -412,6 +420,15 @@ export default function CarrinhoPage() {
                   </div>
                 )}
 
+                {allDigital && (
+                  <div className="flex items-center gap-2 rounded-lg border border-primary/20 bg-primary/5 p-3">
+                    <Shield className="w-4 h-4 text-primary shrink-0" />
+                    <p className="text-sm font-sans text-foreground">
+                      Este pedido contém apenas cursos — você receberá o acesso digital imediatamente, sem necessidade de endereço de entrega.
+                    </p>
+                  </div>
+                )}
+
                 <Separator />
 
                 <h2 className="text-xl font-bold text-foreground">Resumo do Pedido</h2>
@@ -426,17 +443,18 @@ export default function CarrinhoPage() {
                   )}
                   <div className="flex justify-between text-muted-foreground">
                     <span>Frete</span>
-                    <span>{!cepSearched ? <span className="text-muted-foreground">—</span>
+                    <span>{allDigital ? <span className="text-green-500">Não se aplica</span>
+                      : !cepSearched ? <span className="text-muted-foreground">—</span>
                       : selectedFreight?.price === 0 ? <span className="text-green-500">Grátis</span>
                       : selectedFreight ? `R$ ${shipping.toFixed(2).replace(".", ",")}`
                       : <span className="text-muted-foreground">Selecione</span>}</span>
                   </div>
-                  {!selectedFreight && (
+                  {!allDigital && !selectedFreight && (
                     <p className="text-xs text-muted-foreground">
                       {cepSearched ? "Selecione uma opção de frete" : "Calcule o frete informando seu CEP"}
                     </p>
                   )}
-                  {(items.some((i) => i.freeShipping) || subtotal > 200) && <p className="text-xs text-green-500">Frete grátis disponível para este pedido!</p>}
+                  {!allDigital && (items.some((i) => i.freeShipping) || subtotal > 200) && <p className="text-xs text-green-500">Frete grátis disponível para este pedido!</p>}
                   <Separator className="my-4" />
                   <div className="flex justify-between text-lg font-bold text-foreground">
                     <span>Total</span><span className="text-primary">R$ {total.toFixed(2).replace(".", ",")}</span>
@@ -451,9 +469,15 @@ export default function CarrinhoPage() {
                 </Button>
 
                 <div className="space-y-3">
-                  <div className="flex items-center gap-3 text-sm font-sans text-muted-foreground">
-                    <Truck className="w-4 h-4 text-primary" /><span>Entrega em todo Brasil</span>
-                  </div>
+                  {allDigital ? (
+                    <div className="flex items-center gap-3 text-sm font-sans text-muted-foreground">
+                      <Shield className="w-4 h-4 text-primary" /><span>Acesso digital imediato após o pagamento</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-3 text-sm font-sans text-muted-foreground">
+                      <Truck className="w-4 h-4 text-primary" /><span>Entrega em todo Brasil</span>
+                    </div>
+                  )}
                   <div className="flex items-center gap-3 text-sm font-sans text-muted-foreground">
                     <Shield className="w-4 h-4 text-primary" /><span>Pagamento 100% seguro</span>
                   </div>

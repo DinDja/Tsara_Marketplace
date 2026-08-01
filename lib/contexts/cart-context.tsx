@@ -22,8 +22,7 @@ function isPurchasable(product: Product) {
   return product.status !== "inactive"
     && !product.priceOnRequest
     && product.price > 0
-    && product.stockManaged !== false
-    && product.stock > 0
+    && (product.stockManaged === false || product.stock > 0)
 }
 
 function loadCart(): CartItem[] {
@@ -87,7 +86,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     setItems((prev) => {
       const existing = prev.find((i) => i.productId === product.id)
       const currentQty = existing ? existing.quantity : 0
-      if (currentQty + quantity > product.stock) {
+      if (product.stockManaged !== false && currentQty + quantity > product.stock) {
         return prev
       }
       if (existing) {

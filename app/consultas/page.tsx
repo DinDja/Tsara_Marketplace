@@ -3,17 +3,17 @@
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { motion } from "framer-motion"
-import { ArrowLeft, CalendarCheck, ChevronLeft, ChevronRight, Loader2, ShieldCheck, Sparkles, Video } from "lucide-react"
+import { ArrowLeft, CalendarCheck, ChevronLeft, ChevronRight, Loader2, ShieldCheck, MousePointer, Video } from "lucide-react"
 import { MoonIcon } from "@/components/moon-icon"
 import { Button } from "@/components/ui/button"
 import { EmptyScheduleState, SchedulingTypeCard } from "@/components/scheduling"
 import { useConsultationTypesPaginated } from "@/lib/hooks"
 
 const processSteps = [
-  { icon: Sparkles, label: "Escolha o atendimento", text: "Compare objetivos, duracao e valor." },
-  { icon: CalendarCheck, label: "Reserve um horario", text: "Veja apenas horarios realmente livres." },
-  { icon: Video, label: "Receba as orientacoes", text: "Confirmacao enviada com os detalhes." },
-]
+   { icon: MousePointer, label: "Escolha o atendimento", text: "Compare objetivos, duracao e valor." },
+   { icon: CalendarCheck, label: "Reserve um horario", text: "Veja apenas horarios realmente livres." },
+   { icon: Video, label: "Receba as orientacoes", text: "Confirmacao enviada com os detalhes." },
+ ]
 
 export default function ConsultasPage() {
   const { data: types, loading, total, page, hasMore, goToPage } = useConsultationTypesPaginated(20)

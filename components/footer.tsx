@@ -17,6 +17,7 @@ const footerLinks = {
     { label: "Baralho Cigano", href: "#" },
     { label: "Sessão Completa", href: "#" },
     { label: "Agendar", href: "#" },
+    { label: "Cursos", href: "/cursos" },
   ],
   suporte: [
     { label: "FAQ", href: "#" },

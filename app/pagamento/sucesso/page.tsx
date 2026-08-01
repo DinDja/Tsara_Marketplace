@@ -6,11 +6,11 @@ import Link from "next/link"
 import { motion } from "framer-motion"
 import { CheckCircle2, XCircle, Loader2, ArrowLeft, CreditCard, Banknote } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { verifyInfinitePayPayment } from "@/lib/services/infinitePay"
-import { updateOrder, getOrderById } from "@/lib/services/orders"
-import { getProductById, updateProduct } from "@/lib/services/products"
 
 type PaymentState = "verifying" | "success" | "error" | "not-found"
+
+const MAX_ATTEMPTS = 3
+const RETRY_DELAY_MS = 2500
 
 export default function PagamentoSucessoPage() {
   return (
@@ -34,6 +34,7 @@ function PagamentoSucessoContent() {
   const [state, setState] = useState<PaymentState>("verifying")
   const [paymentInfo, setPaymentInfo] = useState<any>(null)
   const [errorMsg, setErrorMsg] = useState("")
+  const [attempt, setAttempt] = useState(1)
 
   useEffect(() => {
     const orderNsu = searchParams.get("order_nsu")
@@ -46,44 +47,62 @@ function PagamentoSucessoContent() {
       return
     }
 
-    ;(async () => {
-      try {
-        const result = await verifyInfinitePayPayment({ orderNsu, transactionNsu, slug })
+    let cancelled = false
+    let timer: ReturnType<typeof setTimeout>
 
-        if (result.paid) {
-          await updateOrder(orderNsu, {
-            status: "processing",
-            transactionNsu,
+    const verify = async (attemptNumber: number) => {
+      try {
+        const res = await fetch("/api/infinitepay/confirm", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ orderNsu, transactionNsu, slug, captureMethod }),
+        })
+        const result = await res.json()
+
+        if (cancelled) return
+
+        if (res.ok && result.paid) {
+          setPaymentInfo({
+            paid: true,
+            paid_amount: result.paidAmount,
             captureMethod,
-            paidAmount: result.paid_amount,
+            orderId: result.orderId,
+            digital: result.digital,
           })
-          const order = await getOrderById(orderNsu)
-          if (order) {
-            await Promise.all(
-              order.items.map(async (item) => {
-                const product = await getProductById(item.productId)
-                if (product) {
-                  await updateProduct(item.productId, {
-                    sold: (product.sold || 0) + item.quantity,
-                    stock: Math.max(0, (product.stock || 0) - item.quantity),
-                  })
-                }
-              })
-            )
-          }
-          setPaymentInfo({ ...result, order, captureMethod })
           setState("success")
-        } else {
-          await updateOrder(orderNsu, { transactionNsu, captureMethod })
-          setPaymentInfo({ ...result, captureMethod })
-          setState("error")
-          setErrorMsg("Pagamento não foi aprovado. Entre em contato conosco.")
+          return
         }
+
+        // Falha recuperável: a InfinitePay pode ainda não ter registrado o pagamento,
+        // ou houve um erro de rede transitório. Tentamos novamente antes de desistir.
+        if (attemptNumber < MAX_ATTEMPTS) {
+          setState("verifying")
+          setAttempt(attemptNumber + 1)
+          timer = setTimeout(() => verify(attemptNumber + 1), RETRY_DELAY_MS)
+          return
+        }
+
+        setState("error")
+        setErrorMsg(result.error || "Pagamento não foi aprovado. Entre em contato conosco.")
       } catch (err: any) {
+        if (cancelled) return
+        if (attemptNumber < MAX_ATTEMPTS) {
+          setState("verifying")
+          setAttempt(attemptNumber + 1)
+          timer = setTimeout(() => verify(attemptNumber + 1), RETRY_DELAY_MS)
+          return
+        }
         setState("error")
         setErrorMsg(err.message || "Erro ao verificar pagamento")
       }
-    })()
+    }
+
+    verify(1)
+
+    return () => {
+      cancelled = true
+      if (timer) clearTimeout(timer)
+    }
   }, [searchParams])
 
   return (
@@ -99,7 +118,9 @@ function PagamentoSucessoContent() {
               <Loader2 className="w-10 h-10 text-primary animate-spin" />
             </div>
             <h1 className="text-2xl font-bold text-foreground mb-2">Verificando Pagamento</h1>
-            <p className="text-muted-foreground font-sans">Aguarde enquanto confirmamos seu pagamento...</p>
+            <p className="text-muted-foreground font-sans">
+              Aguarde enquanto confirmamos seu pagamento{attempt > 1 ? ` (tentativa ${attempt} de ${MAX_ATTEMPTS})` : "..."}.
+            </p>
           </>
         )}
 
@@ -110,7 +131,9 @@ function PagamentoSucessoContent() {
             </div>
             <h1 className="text-3xl font-bold text-foreground mb-2">Pagamento Confirmado!</h1>
             <p className="text-muted-foreground font-sans mb-6">
-              Seu pedido foi pago com sucesso e já está sendo processado.
+              {paymentInfo?.digital
+                ? "Seu pagamento foi confirmado e o acesso aos cursos já está liberado na sua conta."
+                : "Seu pedido foi pago com sucesso e já está sendo processado."}
             </p>
             {paymentInfo && (
               <div className="bg-card border border-border rounded-xl p-4 text-left text-sm font-sans space-y-2 mb-8">
@@ -136,19 +159,25 @@ function PagamentoSucessoContent() {
                     )}
                   </span>
                 </div>
-                {paymentInfo.order && (
+                {paymentInfo.orderId && (
                   <div className="flex items-center justify-between text-muted-foreground pt-2 border-t border-border">
                     <span>Pedido</span>
-                    <span className="text-foreground font-mono">#{paymentInfo.order.id.slice(0, 8)}</span>
+                    <span className="text-foreground font-mono">#{paymentInfo.orderId.slice(0, 8)}</span>
                   </div>
                 )}
               </div>
             )}
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
-              <Button asChild variant="outline">
+              {paymentInfo?.digital && (
+                <Button asChild className="bg-primary hover:bg-primary/90">
+                  <Link href="/cursos">Acessar meus cursos</Link>
+                </Button>
+              )}
+              <Button asChild variant={paymentInfo?.digital ? "outline" : "default"}
+                className={paymentInfo?.digital ? undefined : "bg-primary hover:bg-primary/90"}>
                 <Link href="/meus-pedidos">Acompanhar Pedido</Link>
               </Button>
-              <Button asChild className="bg-primary hover:bg-primary/90">
+              <Button asChild variant="outline">
                 <Link href="/">Continuar Comprando</Link>
               </Button>
             </div>

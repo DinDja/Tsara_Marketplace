@@ -18,11 +18,12 @@ export interface Product {
   priceOnRequest?: boolean
   stockManaged?: boolean
   source?: ProductSource
+  courseId?: string
   createdAt: Date
   updatedAt: Date
 }
 
-export type ProductCategory = "Cristais" | "Velas" | "Incensos" | "Oráculos" | "Acessórios" | "Rituais"
+export type ProductCategory = "Cristais" | "Velas" | "Incensos" | "Oráculos" | "Acessórios" | "Rituais" | "Cursos"
 
 export interface ProductSource {
   provider: "luar" | string

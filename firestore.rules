@@ -101,12 +101,26 @@ service cloud.firestore {
         || (isAuthenticated()
             && resource.data.clientId == request.auth.uid);
 
+      // Pedido criado pelo cliente somente em estado 'pending'
+      // (status pagos só podem ser gravados pelo servidor/admin)
       allow create: if isAuthenticated()
-        && request.resource.data.clientId == request.auth.uid;
+        && request.resource.data.clientId == request.auth.uid
+        && request.resource.data.status == 'pending'
+        && request.resource.data.items is list
+        && request.resource.data.total is number
+        && request.resource.data.subtotal is number;
 
+      // Cliente só pode: vincular checkout em pedido pending,
+      // ou cancelar o próprio pedido pending
       allow update: if isAdmin()
         || (isAuthenticated()
-            && resource.data.clientId == request.auth.uid);
+            && resource.data.clientId == request.auth.uid
+            && resource.data.status == 'pending'
+            && (request.resource.data.diff(resource.data).affectedKeys()
+                  .hasOnly(['checkoutUrl', 'orderNsu', 'updatedAt'])
+                || (request.resource.data.diff(resource.data).affectedKeys()
+                      .hasOnly(['status', 'updatedAt'])
+                    && request.resource.data.status == 'cancelled')));
 
       allow delete: if isAdmin();
     }
@@ -142,9 +156,12 @@ service cloud.firestore {
       allow read: if isAuthenticated()
         && (userId == request.auth.uid || isAdmin());
 
-      // Usuário cria próprio perfil no registro
+      // Usuário cria próprio perfil no registro — sem auto-atribuição de role
       allow create: if isAuthenticated()
-        && userId == request.auth.uid;
+        && userId == request.auth.uid
+        && request.resource.data.role == 'user'
+        && request.resource.data.name is string
+        && request.resource.data.email == request.auth.token.email;
 
       // Próprio usuário ou admin pode atualizar
       allow update: if isAdmin()
@@ -212,6 +229,15 @@ service cloud.firestore {
         // Apenas admin pode atualizar/deletar mensagens (moderação)
         allow update, delete: if isAdmin();
       }
+    }
+
+    // ==========================================
+    // CURSOS
+    // ==========================================
+
+    match /cursos/{cursoId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
     }
 
     // ==========================================
