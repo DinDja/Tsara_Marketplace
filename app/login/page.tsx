@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { Eye, EyeOff, Mail, Lock, ArrowLeft, Loader2 } from "lucide-react";
 import { MoonIcon } from "@/components/moon-icon";
@@ -20,6 +20,14 @@ import { toast } from "sonner";
 import Zodiac from "@/public/Astro zodiac.json";
 
 export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-background" />}>
+      <LoginContent />
+    </Suspense>
+  );
+}
+
+function LoginContent() {
   const [isLogin, setIsLogin] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState("");
@@ -30,6 +38,10 @@ export default function LoginPage() {
   const [resetting, setResetting] = useState(false)
   const { login, register, loginGoogle, loading } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  const rawRedirect = searchParams.get("redirect")
+  const redirect = rawRedirect && rawRedirect.startsWith("/") && !rawRedirect.startsWith("//") ? rawRedirect : "/"
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,11 +49,11 @@ export default function LoginPage() {
       if (isLogin) {
         await login(email, password);
         toast.success("Bem-vindo(a) de volta!");
-        router.push("/");
+        router.push(redirect);
       } else {
         await register(name, email, password);
         toast.success("Conta criada com sucesso!");
-        router.push("/");
+        router.push(redirect);
       }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Erro na autenticação");
@@ -208,7 +220,7 @@ export default function LoginPage() {
               try {
                 await loginGoogle();
                 toast.success("Bem-vindo(a)!");
-                router.push("/");
+                router.push(redirect);
               } catch (err) {
                 toast.error(err instanceof Error ? err.message : "Erro ao fazer login com Google");
               }

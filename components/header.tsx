@@ -1,9 +1,25 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, type ComponentType } from "react"
 import Link from "next/link"
+import { usePathname } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
-import { Menu, X, ShoppingCart, Calendar, User, LogOut, Settings } from "lucide-react"
+import {
+  Menu,
+  X,
+  ShoppingCart,
+  Calendar,
+  User,
+  LogOut,
+  Settings,
+  ChevronRight,
+  Home,
+  Store,
+  Sparkles,
+  GraduationCap,
+  Heart,
+  type LucideProps,
+} from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 import { useCart } from "@/lib/contexts/cart-context"
@@ -19,20 +35,90 @@ import {
 import { toast } from "sonner"
 import { MoonIcon } from "@/components/moon-icon"
 
+const MOBILE_NAV = [
+  { href: "/", label: "Início", icon: Home },
+  { href: "/produtos", label: "Loja", icon: Store },
+  { href: "/consultas", label: "Consultas", icon: Sparkles },
+  { href: "/cursos", label: "Cursos", icon: GraduationCap },
+  { href: "#depoimentos", label: "Depoimentos", icon: Heart },
+] as const
+
+type IconType = ComponentType<LucideProps>
+
+function MobileMenuLink({
+  href,
+  label,
+  icon: Icon,
+  active,
+  onClick,
+  className,
+}: {
+  href: string
+  label: string
+  icon: IconType
+  active?: boolean
+  onClick?: () => void
+  className?: string
+}) {
+  return (
+    <Link
+      href={href}
+      onClick={onClick}
+      className={`group flex items-center gap-4 rounded-xl border px-4 py-3.5 transition-colors duration-200 ${
+        active
+          ? "border-gold/30 bg-gold/10 text-gold"
+          : "border-transparent text-muted-foreground hover:border-border/60 hover:bg-secondary/60 hover:text-foreground"
+      } ${className ?? ""}`}
+    >
+      <Icon
+        className={`h-5 w-5 shrink-0 transition-colors ${active ? "text-gold" : "text-muted-foreground group-hover:text-gold"}`}
+      />
+      <span className={`font-sans text-base ${active ? "font-medium text-gold" : ""}`}>{label}</span>
+      {active ? (
+        <span className="ml-auto h-1.5 w-1.5 rounded-full bg-gold" />
+      ) : (
+        <ChevronRight className="ml-auto h-4 w-4 shrink-0 text-muted-foreground/50 transition-transform group-hover:translate-x-0.5 group-hover:text-gold-muted" />
+      )}
+    </Link>
+  )
+}
+
+function SectionLabel({ children }: { children: string }) {
+  return (
+    <p className="mb-3 px-1 font-sans text-[11px] font-medium uppercase tracking-[0.25em] text-gold-muted">
+      {children}
+    </p>
+  )
+}
+
 export function Header() {
   const [isOpen, setIsOpen] = useState(false)
   const [hydrated, setHydrated] = useState(false)
   const { itemCount } = useCart()
   const { user, logout } = useAuth()
+  const pathname = usePathname()
 
-  useEffect(() => { setHydrated(true) }, [])
+  useEffect(() => {
+    setHydrated(true)
+  }, [])
 
   useEffect(() => {
     if (!isOpen) return
     const originalOverflow = document.body.style.overflow
     document.body.style.overflow = "hidden"
-    return () => { document.body.style.overflow = originalOverflow }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setIsOpen(false)
+    }
+    window.addEventListener("keydown", onKey)
+    return () => {
+      document.body.style.overflow = originalOverflow
+      window.removeEventListener("keydown", onKey)
+    }
   }, [isOpen])
+
+  useEffect(() => {
+    setIsOpen(false)
+  }, [pathname])
 
   const handleLogout = async () => {
     await logout()
@@ -40,6 +126,8 @@ export function Header() {
   }
 
   const initials = user?.name?.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()
+  const isActive = (href: string) =>
+    href === "/" ? pathname === "/" : href.startsWith("#") ? false : pathname.startsWith(href)
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50">
@@ -119,84 +207,131 @@ export function Header() {
             </Link>
           </div>
 
-          <button className="md:hidden p-2 text-foreground mt-4" onClick={() => setIsOpen(!isOpen)} aria-label="Menu">
-            {isOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-          </button>
+          <div className="flex md:hidden items-center gap-1">
+            <Link href="/carrinho" className="relative p-2 text-foreground hover:text-gold transition-colors" aria-label="Carrinho">
+              <ShoppingCart className="w-5 h-5" />
+              {hydrated && itemCount > 0 && (
+                <span className="absolute top-0 right-0 bg-gold text-background text-[10px] font-bold font-sans w-4.5 h-4.5 min-w-[18px] rounded-full flex items-center justify-center">
+                  {itemCount > 9 ? "9+" : itemCount}
+                </span>
+              )}
+            </Link>
+            <button
+              className="p-2 text-foreground hover:text-gold transition-colors"
+              onClick={() => setIsOpen(!isOpen)}
+              aria-label={isOpen ? "Fechar menu" : "Abrir menu"}
+              aria-expanded={isOpen}
+            >
+              {isOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+            </button>
+          </div>
         </div>
 
         <AnimatePresence>
           {isOpen && (
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="fixed inset-0 z-40 md:hidden bg-background/95 backdrop-blur-lg">
-              <div className="h-full overflow-y-auto px-6 pt-28 pb-8">
-                <div className="mx-auto flex min-h-full max-w-sm flex-col justify-between">
-                  <div className="space-y-6">
-                    {NAV_LINKS.map((link, index) => (
-                      <motion.div key={link.href} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: index * 0.08 }}>
-                        <Link href={link.href} className="block py-2 text-2xl tracking-[0.1em] text-muted-foreground hover:text-gold transition-colors" onClick={() => setIsOpen(false)}>
-                          {link.label}
-                        </Link>
-                      </motion.div>
-                    ))}
-                  </div>
-                  <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="pt-10 space-y-6">
-                    {user ? (
-                      <>
-                        <div className="flex items-center gap-3 px-2 mb-4">
-                          <Avatar className="w-10 h-10">
-                            <AvatarImage src={user.avatar} alt={user.name} />
-                            <AvatarFallback className="text-sm font-bold text-gold bg-gold/20">{initials}</AvatarFallback>
-                          </Avatar>
-                          <div>
-                            <p className="text-sm font-medium text-foreground">{user.name}</p>
-                            <p className="text-xs font-sans text-muted-foreground">{user.email}</p>
-                          </div>
-                        </div>
-                        <Link href="/conta" onClick={() => setIsOpen(false)}>
-                          <Button variant="outline" className="w-full border-border text-foreground hover:bg-gold/10 justify-start gap-2">
-                            <User className="w-4 h-4" /> Minha Conta
-                          </Button>
-                        </Link>
-                        <Link href="/minhas-consultas" onClick={() => setIsOpen(false)}>
-                          <Button variant="outline" className="w-full border-border text-foreground hover:bg-gold/10 justify-start gap-2">
-                            <Calendar className="w-4 h-4" /> Minhas Consultas
-                          </Button>
-                        </Link>
-                        <Link href="/meus-pedidos" onClick={() => setIsOpen(false)}>
-                          <Button variant="outline" className="w-full border-border text-foreground hover:bg-gold/10 justify-start gap-2">
-                            <ShoppingCart className="w-4 h-4" /> Meus Pedidos
-                          </Button>
-                        </Link>
-                        {user.role === "admin" && (
-                          <Link href="/admin" onClick={() => setIsOpen(false)}>
-                            <Button variant="outline" className="w-full border-border text-foreground hover:bg-gold/10 justify-start gap-2">
-                              <Settings className="w-4 h-4" /> Admin
-                            </Button>
-                          </Link>
-                        )}
-                        <Button variant="outline" onClick={() => { handleLogout(); setIsOpen(false); }}
-                          className="w-full border-red-500/30 text-red-400 hover:bg-red-500/10 justify-start gap-2">
-                          <LogOut className="w-4 h-4" /> Sair
-                        </Button>
-                      </>
-                    ) : (
-                      <Link href="/login" onClick={() => setIsOpen(false)}>
-                        <Button variant="outline" className="w-full border-border text-foreground hover:bg-gold/10 hover:border-gold/50">Entrar</Button>
-                      </Link>
-                    )}
-                    <div className="flex gap-3">
-                      <Link href="/carrinho" className="flex-1" onClick={() => setIsOpen(false)}>
-                        <Button variant="outline" className="w-full border-gold/50 text-gold hover:bg-gold/10">
-                          <ShoppingCart className="w-4 h-4 mr-2" />
-                          Carrinho{hydrated && itemCount > 0 && ` (${itemCount})`}
-                        </Button>
-                      </Link>
-                      <Link href="/agendamento" className="flex-1" onClick={() => setIsOpen(false)}>
-                        <Button className="w-full bg-gold text-background hover:bg-gold/90">
-                          <Calendar className="w-4 h-4 mr-2" /> Agendar
-                        </Button>
-                      </Link>
+            <motion.div
+              initial={{ opacity: 0, y: -16 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -16 }}
+              transition={{ duration: 0.28, ease: "easeOut" }}
+              className="fixed inset-0 z-40 md:hidden bg-background/95 backdrop-blur-xl stars-pattern"
+            >
+              <div className="h-dvh overflow-y-auto overscroll-contain px-6 pt-28 pb-10">
+                <div className="mx-auto max-w-md">
+                  {user && (
+                    <Link
+                      href="/conta"
+                      onClick={() => setIsOpen(false)}
+                      className="mb-8 flex items-center gap-4 rounded-2xl border border-border/60 bg-card/60 p-4 transition-colors hover:border-gold/30"
+                    >
+                      <Avatar className="h-12 w-12">
+                        <AvatarImage src={user.avatar} alt={user.name} />
+                        <AvatarFallback className="text-sm font-bold text-gold bg-gold/20">{initials}</AvatarFallback>
+                      </Avatar>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate font-sans text-sm font-semibold text-foreground">{user.name}</p>
+                        <p className="truncate font-sans text-xs text-muted-foreground">{user.email}</p>
+                      </div>
+                      <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    </Link>
+                  )}
+
+                  <div className="mb-8">
+                    <SectionLabel>Navegação</SectionLabel>
+                    <div className="flex flex-col gap-1.5">
+                      {MOBILE_NAV.map((link, index) => (
+                        <motion.div
+                          key={link.href}
+                          initial={{ opacity: 0, x: -12 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: 0.05 + index * 0.05 }}
+                        >
+                          <MobileMenuLink
+                            href={link.href}
+                            label={link.label}
+                            icon={link.icon}
+                            active={isActive(link.href)}
+                            onClick={() => setIsOpen(false)}
+                          />
+                        </motion.div>
+                      ))}
                     </div>
+                  </div>
+
+                  <div className="mb-8">
+                    <SectionLabel>{user ? "Conta" : "Acesso"}</SectionLabel>
+                    <div className="flex flex-col gap-1.5">
+                      {user ? (
+                        <>
+                          <MobileMenuLink href="/conta" label="Minha Conta" icon={User} active={isActive("/conta")} onClick={() => setIsOpen(false)} />
+                          <MobileMenuLink href="/minhas-consultas" label="Minhas Consultas" icon={Calendar} active={isActive("/minhas-consultas")} onClick={() => setIsOpen(false)} />
+                          <MobileMenuLink href="/meus-pedidos" label="Meus Pedidos" icon={ShoppingCart} active={isActive("/meus-pedidos")} onClick={() => setIsOpen(false)} />
+                          {user.role === "admin" && (
+                            <MobileMenuLink href="/admin" label="Admin" icon={Settings} active={isActive("/admin")} onClick={() => setIsOpen(false)} />
+                          )}
+                          <button
+                            onClick={() => {
+                              setIsOpen(false)
+                              handleLogout()
+                            }}
+                            className="group flex items-center gap-4 rounded-xl border border-transparent px-4 py-3.5 font-sans text-base text-red-400 transition-colors duration-200 hover:border-red-500/30 hover:bg-red-500/10"
+                          >
+                            <LogOut className="h-5 w-5 shrink-0 transition-colors group-hover:text-red-400" />
+                            Sair
+                          </button>
+                        </>
+                      ) : (
+                        <Link href="/login" onClick={() => setIsOpen(false)}>
+                          <Button variant="outline" className="w-full h-12 border-border text-foreground hover:bg-gold/10 hover:border-gold/50 font-sans">
+                            <User className="w-4 h-4" /> Entrar / Criar conta
+                          </Button>
+                        </Link>
+                      )}
+                    </div>
+                  </div>
+
+                  <motion.div
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.3 }}
+                    className="flex gap-3 pt-2"
+                  >
+                    <Link href="/carrinho" className="flex-1" onClick={() => setIsOpen(false)}>
+                      <Button variant="outline" className="relative w-full h-12 border-gold/50 text-gold hover:bg-gold/10 font-sans">
+                        <ShoppingCart className="w-4 h-4 mr-2" />
+                        Carrinho
+                        {hydrated && itemCount > 0 && (
+                          <span className="absolute -top-1.5 -right-1.5 bg-gold text-background text-[10px] font-bold font-sans w-5 h-5 rounded-full flex items-center justify-center">
+                            {itemCount > 9 ? "9+" : itemCount}
+                          </span>
+                        )}
+                      </Button>
+                    </Link>
+                    <Link href="/agendamento" className="flex-1" onClick={() => setIsOpen(false)}>
+                      <Button className="w-full h-12 bg-gold text-background hover:bg-gold/90 font-sans">
+                        <Calendar className="w-4 h-4 mr-2" /> Agendar
+                      </Button>
+                    </Link>
                   </motion.div>
                 </div>
               </div>

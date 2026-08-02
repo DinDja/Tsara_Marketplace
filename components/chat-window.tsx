@@ -16,7 +16,8 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { useChat } from "@/lib/hooks/use-chat"
 import { compressImage, fileToBase64, deleteMessage } from "@/lib/services/chat"
-import type { ChatMessage } from "@/lib/types"
+import { ProductInquiryCard } from "@/components/product-inquiry-card"
+import type { ChatMessage, Product } from "@/lib/types"
 import { toast } from "sonner"
 
 interface ChatWindowProps {
@@ -28,6 +29,8 @@ interface ChatWindowProps {
   peerName: string
   peerAvatar?: string
   peerSubtitle?: string
+  /** Produto sendo consultado — exibido como card acima das mensagens */
+  inquiryProduct?: Product | null
   /** Callback quando não há chat ainda */
   emptyState?: React.ReactNode
   /** Oculta o cabeçalho interno (útil quando a página fornece seu próprio header) */
@@ -37,7 +40,7 @@ interface ChatWindowProps {
 const MAX_AUDIO_MS = 60_000
 
 export function ChatWindow({
-  chatId, role, senderId, senderName, peerName, peerAvatar, peerSubtitle, emptyState, hideHeader,
+  chatId, role, senderId, senderName, peerName, peerAvatar, peerSubtitle, inquiryProduct, emptyState, hideHeader,
 }: ChatWindowProps) {
   const { messages, loading, sending, send } = useChat({ chatId, role })
   const [text, setText] = useState("")
@@ -211,6 +214,11 @@ export function ChatWindow({
         ref={scrollRef}
         className="flex-1 min-h-0 overflow-y-auto px-2 sm:px-4 py-2 sm:py-3 space-y-1.5 wa-chat-bg"
       >
+        {inquiryProduct && (
+          <div className="pt-1 pb-2">
+            <ProductInquiryCard product={inquiryProduct} />
+          </div>
+        )}
         {loading ? (
           <div className="flex items-center justify-center h-full">
             <div className="text-center">

@@ -13,6 +13,7 @@ import {
   onSnapshot,
   serverTimestamp,
   Timestamp,
+  increment,
   limit,
   writeBatch,
 } from "firebase/firestore"
@@ -223,6 +224,8 @@ export async function sendMessage(input: SendMessageInput): Promise<string> {
   })
 
   const preview = previewFor(input.type, input.text)
+  // Incrementa o contador de não-lidas do DESTINATÁRIO
+  // (cliente envia -> admin tem não-lidas; admin envia -> cliente tem não-lidas)
   const unreadField = input.senderRole === "admin" ? "unreadByClient" : "unreadByAdmin"
 
   await updateDoc(doc(db, FIRESTORE_COLLECTIONS.chats, input.chatId), {
@@ -230,7 +233,7 @@ export async function sendMessage(input: SendMessageInput): Promise<string> {
     lastMessageType: input.type,
     lastMessageAt: now,
     updatedAt: now,
-    [unreadField]: 0,
+    [unreadField]: increment(1),
     ...(input.senderRole === "admin"
       ? { adminId: input.senderId, adminName: input.senderName }
       : {}),

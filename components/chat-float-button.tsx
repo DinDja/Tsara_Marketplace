@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { usePathname } from "next/navigation"
 import { X, MessageCircle, Trash2, MoreVertical } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -16,8 +16,10 @@ import {
 } from "@/components/ui/dialog"
 import { cn } from "@/lib/utils"
 import { ChatWindow } from "./chat-window"
+import { ProductInquiryCard } from "./product-inquiry-card"
 import { useAuth } from "@/lib/contexts/auth-context"
-import { listChats, subscribeChats, getOrCreateChatForClient, deleteChat } from "@/lib/services/chat"
+import { useSupportChat, INQUIRY_TTL_MS } from "@/lib/contexts/chat-context"
+import { listChats, subscribeChats, getOrCreateChatForClient, deleteChat, sendMessage } from "@/lib/services/chat"
 import type { Chat } from "@/lib/types"
 import {
   DropdownMenu,
@@ -25,6 +27,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { toast } from "sonner"
 
 interface ChatFloatButtonProps {
   className?: string
@@ -40,6 +43,8 @@ export function ChatFloatButton({ className }: ChatFloatButtonProps) {
   const [hasNewMessages, setHasNewMessages] = useState(false)
   const [showDeleteChatDialog, setShowDeleteChatDialog] = useState(false)
   const [chatToDelete, setChatToDelete] = useState<string | null>(null)
+  const { pendingInquiry, clearPendingInquiry } = useSupportChat()
+  const handledInquiryId = useRef<string | null>(null)
   
   // Carregar chats para administradores (hook sempre chamado na mesma ordem)
   useEffect(() => {
@@ -59,6 +64,58 @@ export function ChatFloatButton({ className }: ChatFloatButtonProps) {
     
     return unsubscribe
   }, [user])
+
+  // Abre o chat com o produto quando o cliente pede consulta de disponibilidade
+  useEffect(() => {
+    if (!pendingInquiry) {
+      handledInquiryId.current = null
+      return
+    }
+    if (!user) return
+
+    if (Date.now() - pendingInquiry.at > INQUIRY_TTL_MS) {
+      clearPendingInquiry()
+      return
+    }
+
+    if (handledInquiryId.current === pendingInquiry.product.id) return
+    handledInquiryId.current = pendingInquiry.product.id
+
+    const { product } = pendingInquiry
+    setIsOpen(true)
+
+    ;(async () => {
+      try {
+        const chat = await getOrCreateChatForClient({
+          clientId: user.id,
+          clientName: user.name,
+          clientEmail: user.email,
+          clientAvatar: user.avatar,
+        })
+        setSelectedChat(chat.id)
+        const productUrl = `${window.location.origin}/produto/${product.id}`
+        await sendMessage({
+          chatId: chat.id,
+          senderId: user.id,
+          senderName: user.name,
+          senderRole: "client",
+          type: "text",
+          text: `Olá! Gostaria de saber sobre a disponibilidade do produto "${product.name}".\n${productUrl}`,
+        })
+      } catch (error) {
+        console.error("Erro ao abrir chat com produto:", error)
+        toast.error("Não foi possível iniciar o chat. Tente novamente.")
+      }
+    })()
+  }, [pendingInquiry, user, clearPendingInquiry])
+
+  // Limpa a consulta pendente ao fechar o painel de chat
+  useEffect(() => {
+    if (!isOpen) clearPendingInquiry()
+  }, [isOpen, clearPendingInquiry])
+
+  const activeInquiry =
+    pendingInquiry && Date.now() - pendingInquiry.at <= INQUIRY_TTL_MS ? pendingInquiry.product : null
 
   // Early return DEPOIS de todos os hooks
   const hideButton = pathname === '/admin/chat'
@@ -150,6 +207,11 @@ export function ChatFloatButton({ className }: ChatFloatButtonProps) {
 
         {/* Conteúdo — flex-1 p/ preencher tudo no mobile fullscreen */}
         <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
+          {activeInquiry && (
+            <div className="p-3 pb-1 shrink-0">
+              <ProductInquiryCard product={activeInquiry} />
+            </div>
+          )}
           {user.role === "admin" ? (
             <AdminChatList 
               chats={chats} 
@@ -237,6 +299,7 @@ export function ChatFloatButton({ className }: ChatFloatButtonProps) {
                   </div>
                 </div>
               }
+              inquiryProduct={activeInquiry}
               hideHeader
             />
           </div>

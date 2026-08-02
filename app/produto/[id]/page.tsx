@@ -2,10 +2,10 @@
 
 import { useState } from "react"
 import Link from "next/link"
-import { useParams } from "next/navigation"
+import { useParams, useRouter } from "next/navigation"
 import { motion } from "framer-motion"
 import {
-  ArrowLeft, ShoppingCart, Star,
+  ArrowLeft, ShoppingCart, Star, MessageCircle,
   Truck, Shield,
 } from "lucide-react"
 import { MoonIcon } from "@/components/moon-icon"
@@ -19,6 +19,7 @@ import { SkeletonProductGrid } from "@/components/ui/data-skeleton"
 import { useProduct } from "@/lib/hooks"
 import { useCart } from "@/lib/contexts/cart-context"
 import { useAuth } from "@/lib/contexts/auth-context"
+import { useSupportChat } from "@/lib/contexts/chat-context"
 import { getReviews, createReview } from "@/lib/services"
 import { toast } from "sonner"
 import { cn, formatPrice } from "@/lib/utils"
@@ -31,6 +32,8 @@ export default function ProdutoDetalhe() {
   const { data: product, loading } = useProduct(id)
   const { addItem } = useCart()
   const { user } = useAuth()
+  const { openProductInquiry } = useSupportChat()
+  const router = useRouter()
 
   const [reviews, setReviews] = useState<Review[]>([])
   const [reviewsLoaded, setReviewsLoaded] = useState(false)
@@ -70,6 +73,14 @@ export default function ProdutoDetalhe() {
 
   const consultOnly = product.priceOnRequest || product.stockManaged === false || product.price <= 0
   const unavailable = consultOnly || product.stock <= 0 || product.status === "inactive"
+
+  const handleConsult = () => {
+    openProductInquiry(product)
+    if (!user) {
+      toast.info("Faça login para consultar a disponibilidade do produto")
+      router.push(`/login?redirect=${encodeURIComponent(`/produto/${product.id}`)}`)
+    }
+  }
 
   const handleSubmitReview = async () => {
     if (!user) { toast.error("Faça login para avaliar"); return }
@@ -167,7 +178,7 @@ export default function ProdutoDetalhe() {
 
             <Button onClick={() => {
               if (consultOnly) {
-                toast.info(`${product.name} está disponível sob consulta`)
+                handleConsult()
                 return
               }
               if (product.stock <= 0 || product.status === "inactive") {
@@ -178,7 +189,7 @@ export default function ProdutoDetalhe() {
             }}
               className="w-full h-12 bg-primary hover:bg-primary/90 text-base font-sans gap-2"
               disabled={unavailable}>
-              <ShoppingCart className="w-5 h-5" /> {consultOnly ? "Sob consulta" : product.stock <= 0 ? "Esgotado" : "Adicionar ao Carrinho"}
+              {consultOnly ? <MessageCircle className="w-5 h-5" /> : <ShoppingCart className="w-5 h-5" />} {consultOnly ? "Consultar disponibilidade" : product.stock <= 0 ? "Esgotado" : "Adicionar ao Carrinho"}
             </Button>
 
             <div className="flex items-center gap-6 text-xs font-sans text-muted-foreground pt-2">

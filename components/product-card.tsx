@@ -2,12 +2,16 @@
 
 import Image from "next/image"
 import Link from "next/link"
-import { ArrowRight, PackageSearch, ShoppingCart, Star } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { ArrowRight, MessageCircle, PackageSearch, ShoppingCart, Star } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { ExpandableText } from "@/components/ui/expandable-text"
 import { LiquidGlassCard } from "@/components/ui/liquid-glass-card"
 import { cn, formatPrice } from "@/lib/utils"
+import { useAuth } from "@/lib/contexts/auth-context"
+import { useSupportChat } from "@/lib/contexts/chat-context"
+import { toast } from "sonner"
 import type { Product } from "@/lib/types"
 
 interface ProductCardProps {
@@ -29,8 +33,19 @@ function getStatusLabel(product: Product) {
 
 export function ProductCard({ product, onAddToCart, className }: ProductCardProps) {
   const consultOnly = isConsultOnly(product)
-  const unavailable = consultOnly || product.stock <= 0 || product.status === "inactive"
+  const outOfStock = product.stock <= 0 || product.status === "inactive"
   const status = getStatusLabel(product)
+  const { user } = useAuth()
+  const { openProductInquiry } = useSupportChat()
+  const router = useRouter()
+
+  const handleConsult = () => {
+    openProductInquiry(product)
+    if (!user) {
+      toast.info("Faça login para consultar a disponibilidade do produto")
+      router.push(`/login?redirect=${encodeURIComponent(window.location.pathname)}`)
+    }
+  }
 
   return (
     <LiquidGlassCard className={cn("flex h-full min-h-[548px] flex-col py-0", className)}>
@@ -108,15 +123,26 @@ export function ProductCard({ product, onAddToCart, className }: ProductCardProp
                 <ArrowRight className="h-4 w-4" />
               </Link>
             </Button>
-            <Button
-              type="button"
-              disabled={unavailable}
-              onClick={() => onAddToCart?.(product)}
-              className="font-sans"
-            >
-              <ShoppingCart className="h-4 w-4" />
-              {consultOnly ? "Consulta" : "Adicionar"}
-            </Button>
+            {consultOnly ? (
+              <Button
+                type="button"
+                onClick={handleConsult}
+                className="font-sans"
+              >
+                <MessageCircle className="h-4 w-4" />
+                Consultar
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                disabled={outOfStock}
+                onClick={() => onAddToCart?.(product)}
+                className="font-sans"
+              >
+                <ShoppingCart className="h-4 w-4" />
+                Adicionar
+              </Button>
+            )}
           </div>
         </div>
       </div>
