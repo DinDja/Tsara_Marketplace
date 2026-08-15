@@ -1,6 +1,5 @@
 import {
   collection, getDocs, getDoc, doc, addDoc, updateDoc, deleteDoc, Timestamp,
-  limit, orderBy, startAfter, getCountFromServer, query, where,
 } from "firebase/firestore"
 import { db, FIRESTORE_COLLECTIONS } from "@/lib/firebase/config"
 import type { Client } from "@/lib/types"
@@ -91,25 +90,21 @@ export async function getClientsPaginated(
   pageSize = 20
 ): Promise<PaginatedResult<Client>> {
   try {
-    const countSnap = await getCountFromServer(col)
-    const total = countSnap.data().count
+    // Firestore não suporta queries cross-collection, então buscamos todos os
+    // clientes (coleção "clients" + fallback "users" via getClients) e
+    // paginamos em memória. Isso garante que usuários cadastrados via auth
+    // (que só existem em "users") também apareçam no admin.
+    const all = await getClients()
 
-    const dataConstraints: any[] = [orderBy("name")]
+    // Ordena por nome (case-insensitive) para consistência com a versão anterior
+    all.sort((a, b) => (a.name || "").localeCompare(b.name || "", "pt-BR"))
 
-    if (page > 1) {
-      const prevQ = query(col, ...dataConstraints, limit((page - 1) * pageSize))
-      const prevSnap = await getDocs(prevQ)
-      if (prevSnap.docs.length > 0) {
-        dataConstraints.push(startAfter(prevSnap.docs[prevSnap.docs.length - 1]))
-      }
-    }
-
-    dataConstraints.push(limit(pageSize))
-    const snap = await getDocs(query(col, ...dataConstraints))
-    const docs = snap.docs.map(mapDoc)
+    const total = all.length
     const totalPages = Math.ceil(total / pageSize)
+    const startIdx = (page - 1) * pageSize
+    const data = all.slice(startIdx, startIdx + pageSize)
 
-    return { data: docs, total, hasMore: page < totalPages }
+    return { data, total, hasMore: page < totalPages }
   } catch {
     return { data: [], total: 0, hasMore: false }
   }
