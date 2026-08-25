@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getAdminDb } from "@/lib/firebase/admin"
 import { INFINITEPAY_API_BASE, INFINITEPAY_PAYMENT_CHECK_PATH, getHandle } from "@/lib/infinitePay/config"
+import { evaluateCoupon, type CouponItem } from "@/lib/coupons"
 
 const PAID_STATUSES = ["processing", "shipped", "delivered"]
 const DIGITAL_CATEGORY = "Cursos"
@@ -83,19 +84,39 @@ export async function POST(request: NextRequest) {
     let discount = 0
     if (order.coupon) {
       const cSnap = await db.collection("coupons").where("code", "==", order.coupon.toUpperCase()).get()
-      const coupon = cSnap.docs[0]?.data()
-      const expiresAt = coupon?.expiresAt?.toMillis?.()
-        ?? (coupon?.expiresAt ? Date.parse(String(coupon.expiresAt)) : null)
-      const invalid =
-        !coupon
-        || coupon.active === false
-        || (expiresAt != null && expiresAt < Date.now())
-        || (coupon.maxUses != null && (coupon.usedCount ?? 0) >= coupon.maxUses)
-        || (coupon.minPurchase != null && subtotal < coupon.minPurchase)
-      if (invalid) {
+      const raw = cSnap.docs[0]?.data()
+      if (!raw) {
         return NextResponse.json({ error: "Cupom inválido no pedido" }, { status: 409 })
       }
-      discount = subtotal * (coupon.discount ?? 0) / 100
+      const expiresAt = raw.expiresAt?.toDate?.() ?? (raw.expiresAt ? new Date(raw.expiresAt) : undefined)
+      const couponObj = {
+        id: cSnap.docs[0]!.id,
+        code: raw.code,
+        discount: raw.discount ?? 0,
+        discountType: raw.discountType ?? "percentage",
+        scope: raw.scope ?? "all",
+        productIds: raw.productIds ?? [],
+        categories: raw.categories ?? [],
+        consultationTypeIds: raw.consultationTypeIds ?? [],
+        minPurchase: raw.minPurchase,
+        maxUses: raw.maxUses,
+        usedCount: raw.usedCount ?? 0,
+        expiresAt,
+        active: raw.active ?? true,
+        createdAt: raw.createdAt?.toDate?.() ?? new Date(),
+        updatedAt: raw.updatedAt?.toDate?.() ?? new Date(),
+      }
+      const couponItems: CouponItem[] = itemChecks.map((ic) => ({
+        productId: ic.productId,
+        category: ic.category,
+        price: ic.price,
+        quantity: ic.quantity,
+      }))
+      const ev = evaluateCoupon(couponObj, { kind: "products", items: couponItems })
+      if (!ev.valid) {
+        return NextResponse.json({ error: `Cupom inválido: ${ev.error}` }, { status: 409 })
+      }
+      discount = ev.discountAmount
     }
 
     const expectedTotalCents = Math.round((subtotal - discount) * 100)

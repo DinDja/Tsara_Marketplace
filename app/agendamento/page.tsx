@@ -35,6 +35,7 @@ import { TIME_SLOTS } from "@/lib/constants"
 import { cn } from "@/lib/utils"
 import { createAppointment, getConsultationTypes, getCouponByCode, getOccupiedSlots } from "@/lib/services"
 import { useAuth } from "@/lib/contexts/auth-context"
+import { evaluateCoupon, formatCouponDiscount } from "@/lib/coupons"
 import { toast } from "sonner"
 import type { Coupon, TimeSlot } from "@/lib/types"
 import type { ConsultationType } from "@/lib/services/consultations"
@@ -415,8 +416,24 @@ function AgendamentoContent() {
     return () => { mounted = false }
   }, [selectedDate])
 
+  useEffect(() => {
+    if (!appliedCoupon || !selectedType) return
+    const ev = evaluateCoupon(appliedCoupon, { kind: "appointment", consultationTypeId: selectedType.id, price: selectedType.price })
+    if (!ev.valid) {
+      setAppliedCoupon(null)
+      setCouponCode("")
+      toast.error(`Cupom removido: ${ev.error ?? "nao aplicavel a este tipo de consulta"}`)
+    }
+  }, [appliedCoupon, selectedType])
+
   const price = selectedType?.price ?? 0
-  const discount = appliedCoupon ? price * (appliedCoupon.discount / 100) : 0
+  const couponEval = useMemo(() =>
+    appliedCoupon
+      ? evaluateCoupon(appliedCoupon, { kind: "appointment", consultationTypeId: selectedType?.id, price })
+      : { discountAmount: 0, valid: false },
+    [appliedCoupon, selectedType, price]
+  )
+  const discount = couponEval.discountAmount
   const finalPrice = Math.max(0, price - discount)
 
   const timeSlots = useMemo((): TimeSlot[] => {
@@ -460,24 +477,13 @@ function AgendamentoContent() {
         toast.error("Cupom nao encontrado.")
         return
       }
-      if (!coupon.active) {
-        toast.error("Este cupom esta inativo.")
-        return
-      }
-      if (coupon.expiresAt && new Date(coupon.expiresAt) < new Date()) {
-        toast.error("Este cupom expirou.")
-        return
-      }
-      if (coupon.maxUses && coupon.usedCount >= coupon.maxUses) {
-        toast.error("Este cupom ja atingiu o limite de uso.")
-        return
-      }
-      if (coupon.minPurchase && price < coupon.minPurchase) {
-        toast.error(`Valor minimo para este cupom: R$ ${coupon.minPurchase.toFixed(2).replace(".", ",")}`)
+      const ev = evaluateCoupon(coupon, { kind: "appointment", consultationTypeId: selectedType?.id, price })
+      if (!ev.valid) {
+        toast.error(ev.error ?? "Cupom invalido.")
         return
       }
       setAppliedCoupon(coupon)
-      toast.success(`Cupom aplicado: ${coupon.discount}% de desconto.`)
+      toast.success(`Cupom aplicado: ${formatCouponDiscount(coupon)} de desconto.`)
     } catch {
       toast.error("Nao foi possivel validar o cupom agora.")
     } finally {

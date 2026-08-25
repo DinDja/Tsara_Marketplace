@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import Link from "next/link"
 import { motion, AnimatePresence } from "framer-motion"
 import {
@@ -26,6 +26,7 @@ import { getProductById } from "@/lib/services/products"
 import { createInfinitePayCheckout } from "@/lib/services/infinitePay"
 import { lookupCep, calculateShipping } from "@/lib/services/shipping"
 import { getCouponByCode } from "@/lib/services"
+import { evaluateCoupon, formatCouponDiscount, type CouponItem } from "@/lib/coupons"
 import { toast } from "sonner"
 import type { CepResult, FreightOption } from "@/lib/services/shipping"
 import type { CartItem, Coupon, Product, UserAddress } from "@/lib/types"
@@ -61,10 +62,28 @@ export default function CarrinhoPage() {
     }
   }, [user])
 
-  const discount = appliedCoupon ? subtotal * (appliedCoupon.discount / 100) : 0
+  const couponItems: CouponItem[] = useMemo(() =>
+    items.map((i) => ({ productId: i.productId, category: i.category, price: i.price, quantity: i.quantity })),
+    [items]
+  )
+  const couponEval = useMemo(() =>
+    appliedCoupon ? evaluateCoupon(appliedCoupon, { kind: "products", items: couponItems }) : { discountAmount: 0, valid: false },
+    [appliedCoupon, couponItems]
+  )
+  const discount = couponEval.discountAmount
   const allDigital = items.length > 0 && items.every(isDigitalItem)
   const shipping = allDigital ? 0 : (selectedFreight?.price ?? 0)
   const total = subtotal - discount + shipping
+
+  useEffect(() => {
+    if (!appliedCoupon) return
+    const ev = evaluateCoupon(appliedCoupon, { kind: "products", items: couponItems })
+    if (!ev.valid) {
+      setAppliedCoupon(null)
+      setCouponCode("")
+      toast.error(`Cupom removido: ${ev.error ?? "não aplicável aos itens atuais"}`)
+    }
+  }, [couponItems, appliedCoupon])
 
   const handleAddressSelect = (addrId: string) => {
     const addr = addresses.find((a) => a.id === addrId)
@@ -117,13 +136,11 @@ export default function CarrinhoPage() {
     setCouponLoading(true)
     try {
       const coupon = await getCouponByCode(couponCode)
-      if (!coupon) { toast.error("Cupom inválido"); setCouponLoading(false); return }
-      if (!coupon.active) { toast.error("Cupom inativo"); setCouponLoading(false); return }
-      if (coupon.expiresAt && new Date(coupon.expiresAt) < new Date()) { toast.error("Cupom expirado"); setCouponLoading(false); return }
-      if (coupon.maxUses && coupon.usedCount >= coupon.maxUses) { toast.error("Cupom esgotado"); setCouponLoading(false); return }
-      if (coupon.minPurchase && subtotal < coupon.minPurchase) { toast.error(`Valor mínimo: R$ ${coupon.minPurchase.toFixed(2).replace(".", ",")}`); setCouponLoading(false); return }
+      if (!coupon) { toast.error("Cupom inválido"); return }
+      const ev = evaluateCoupon(coupon, { kind: "products", items: couponItems })
+      if (!ev.valid) { toast.error(ev.error ?? "Cupom inválido"); return }
       setAppliedCoupon(coupon)
-      toast.success(`Cupom aplicado! ${coupon.discount}% de desconto`)
+      toast.success(`Cupom aplicado! Desconto de ${formatCouponDiscount(coupon)}`)
     } catch { toast.error("Erro ao validar cupom") }
     finally { setCouponLoading(false) }
   }
@@ -319,7 +336,7 @@ export default function CarrinhoPage() {
                     {couponLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : appliedCoupon ? "Aplicado" : "Aplicar"}
                   </Button>
                 </div>
-                {appliedCoupon && <p className="text-sm font-sans text-green-500 mt-2">Cupom {appliedCoupon.code} — {appliedCoupon.discount}% de desconto</p>}
+                {appliedCoupon && <p className="text-sm font-sans text-green-500 mt-2">Cupom {appliedCoupon.code} — {formatCouponDiscount(appliedCoupon)} de desconto</p>}
               </div>
 
               {!allDigital && (

@@ -145,10 +145,24 @@ export interface TimeSlot {
   available: boolean
 }
 
+/** Onde o cupom pode ser usado: loja (produtos), consultas (agendamentos) ou ambos */
+export type CouponScope = "all" | "products" | "appointments"
+
+/** Tipo de desconto: percentual sobre o subtotal elegível ou valor fixo em R$ */
+export type CouponDiscountType = "percentage" | "fixed"
+
 export interface Coupon {
   id: string
   code: string
   discount: number
+  discountType?: CouponDiscountType
+  scope?: CouponScope
+  /** IDs de produtos específicos aos quais o cupom se aplica (loja) */
+  productIds?: string[]
+  /** Categorias de produto às quais o cupom se aplica (loja) */
+  categories?: ProductCategory[]
+  /** IDs de tipos de consulta aos quais o cupom se aplica (agendamento) */
+  consultationTypeIds?: string[]
   minPurchase?: number
   maxUses?: number
   usedCount: number
